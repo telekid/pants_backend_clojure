@@ -846,3 +846,85 @@ def test_generate_deps_edn_nested_source_dirs(rule_runner: RuleRunner) -> None:
     assert not re.search(incorrect_path_pattern, deps_edn_content), (
         f"Found incorrect path 'sub-project' without /src or /test suffix: {deps_edn_content}"
     )
+
+
+def test_generate_deps_edn_many_targets(rule_runner: RuleRunner) -> None:
+    """Regression test: >10 targets must not overflow concurrently() positional args.
+
+    concurrently() form 2 only accepts up to 10 positional arguments. This test
+    ensures we use form 1 (single iterable) so any number of targets works.
+    """
+    num_sources = 8
+    num_tests = 5  # total = 13 > 10
+
+    files: dict[str, str] = {
+        "3rdparty/jvm/BUILD": dedent(
+            """\
+            jvm_artifact(
+                name="org.clojure_clojure",
+                group="org.clojure",
+                artifact="clojure",
+                version="1.12.3",
+            )
+            """
+        ),
+        "3rdparty/jvm/default.lock": _CLOJURE_LOCKFILE,
+    }
+
+    # Generate source targets
+    for i in range(num_sources):
+        files[f"src/ns{i}/BUILD"] = dedent(
+            f"""\
+            clojure_sources(
+                name='lib',
+                dependencies=[
+                    '3rdparty/jvm:org.clojure_clojure',
+                ],
+            )
+            """
+        )
+        files[f"src/ns{i}/ns{i}.clj"] = dedent(
+            f"""\
+            (ns ns{i})
+
+            (defn fn{i} [] "fn{i}")
+            """
+        )
+
+    # Generate test targets
+    for i in range(num_tests):
+        files[f"test/tns{i}/BUILD"] = dedent(
+            f"""\
+            clojure_tests(
+                name='tests',
+                dependencies=[
+                    '3rdparty/jvm:org.clojure_clojure',
+                ],
+            )
+            """
+        )
+        files[f"test/tns{i}/tns{i}_test.clj"] = dedent(
+            f"""\
+            (ns tns{i}-test
+              (:require [clojure.test :refer [deftest is]]))
+
+            (deftest test-{i}
+              (is (= 1 1)))
+            """
+        )
+
+    rule_runner.write_files(files)
+
+    args = [
+        f"--jvm-resolves={repr(_JVM_RESOLVES)}",
+        "--jvm-default-resolve=jvm-default",
+    ]
+    rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
+
+    result = rule_runner.run_goal_rule(
+        GenerateDepsEdn,
+        args=["--generate-deps-edn-resolve=jvm-default"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    assert result.exit_code == 0

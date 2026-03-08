@@ -268,15 +268,14 @@ async def gather_clojure_sources_for_resolve(
             test_targets.append(target)
 
     # Fetch source files for all targets in parallel
+    source_file_requests = [
+        SourceFilesRequest([t[ClojureSourceField]]) for t in source_targets
+    ] + [
+        SourceFilesRequest([t[ClojureTestSourceField]]) for t in test_targets
+    ]
+
     all_source_files = await concurrently(
-        *(
-            determine_source_files(SourceFilesRequest([target[ClojureSourceField]]))
-            for target in source_targets
-        ),
-        *(
-            determine_source_files(SourceFilesRequest([target[ClojureTestSourceField]]))
-            for target in test_targets
-        ),
+        determine_source_files(req) for req in source_file_requests
     )
 
     # Use clj-kondo analysis to extract namespaces
