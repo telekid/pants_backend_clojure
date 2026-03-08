@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Clojure Pants backend now supports **automatic dependency inference for third-party Clojure libraries**. When you require a namespace from a third-party JAR (like `[clojure.data.json :as json]`), Pants will automatically infer the dependency on the corresponding `jvm_artifact` target.
+The Clojure Pants backend supports **automatic dependency inference for third-party Clojure libraries**. When you require a namespace from a third-party JAR (like `[clojure.data.json :as json]`), Pants automatically infers the dependency on the corresponding `jvm_artifact` target.
 
 This eliminates the need to manually specify `dependencies` in your BUILD files for third-party Clojure libraries!
 
@@ -10,7 +10,7 @@ This eliminates the need to manually specify `dependencies` in your BUILD files 
 
 ### Step 1: Generate Lock Files
 
-First, ensure you have JVM lockfiles generated for your project:
+Ensure you have JVM lockfiles generated for your project:
 
 ```bash
 pants generate-lockfiles ::
@@ -22,30 +22,9 @@ This creates lockfiles like:
 3rdparty/jvm/java17.lock
 ```
 
-### Step 2: Generate Clojure Namespace Metadata
+Third-party dependency inference works automatically after this step — no additional commands needed. Pants analyzes the JARs in your lockfiles at build time to discover which Clojure namespaces they provide.
 
-Run the new goal to analyze all JARs and generate namespace mappings:
-
-```bash
-pants generate-clojure-lockfile-metadata ::
-```
-
-This analyzes each JAR in your lockfiles and creates metadata files:
-```
-3rdparty/jvm/default_clojure_namespaces.json
-3rdparty/jvm/java17_clojure_namespaces.json
-```
-
-Example output:
-```
-Generating Clojure namespace metadata from JVM lockfiles...
-  Processing resolve 'default' (3rdparty/jvm/default.lock)...
-  ✓ Generated 3rdparty/jvm/default_clojure_namespaces.json: 15 artifacts, 42 namespaces
-
-✓ Successfully generated metadata for 1 resolve(s).
-```
-
-### Step 3: Write Clojure Code
+### Step 2: Write Clojure Code
 
 Now you can require third-party namespaces without manual dependencies:
 
@@ -59,7 +38,7 @@ Now you can require third-party namespaces without manual dependencies:
   (json/write-str data))
 ```
 
-### Step 4: No BUILD File Changes Needed!
+### Step 3: No BUILD File Changes Needed!
 
 **Before** (manual dependencies required):
 ```python
@@ -88,7 +67,7 @@ Or even simpler with the generator target:
 clojure_sources()  # That's it!
 ```
 
-### Step 5: Build/Test as Normal
+### Step 4: Build/Test as Normal
 
 ```bash
 pants check ::
@@ -102,97 +81,19 @@ Dependencies are automatically inferred!
 
 ### Architecture
 
-1. **JAR Analysis** - The `generate-clojure-lockfile-metadata` goal analyzes each JAR in your lockfiles to extract Clojure namespaces
-2. **Metadata Storage** - Namespace→artifact mappings are stored in `*_clojure_namespaces.json` files
-3. **Dependency Inference** - When you build/test, Pants loads the metadata and automatically infers third-party dependencies
+1. **JAR Analysis** - At build time, Pants analyzes each JAR in your lockfiles to extract Clojure namespaces
+2. **Dependency Inference** - When you build/test, Pants uses this analysis to automatically infer third-party dependencies
 
 ### Resolution Strategy
 
 When you require a namespace, Pants follows this resolution order:
 
 1. **First-party sources** - Checks if you have a local `.clj` file for that namespace
-2. **Third-party libraries** - Falls back to the metadata mappings
-3. **Not found** - If neither exists, no dependency is inferred (will error at runtime)
+2. **Manual `packages` field** - Checks explicit namespace declarations on `jvm_artifact` targets
+3. **Automatic JAR analysis** - Falls back to namespace mappings discovered from lockfile JARs
+4. **Not found** - If none match, no dependency is inferred (will error at runtime)
 
 This ensures that **local code always takes precedence** over third-party libraries.
-
-## Metadata File Format
-
-The generated metadata files use this JSON structure:
-
-```json
-{
-  "version": "1.0",
-  "resolve": "default",
-  "lockfile": "3rdparty/jvm/default.lock",
-  "lockfile_hash": "sha256:abc123...",
-  "artifacts": {
-    "org.clojure:data.json:2.4.0": {
-      "address": "3rdparty/jvm:data-json",
-      "namespaces": ["clojure.data.json"],
-      "source": "jar-analysis"
-    },
-    "org.clojure:core.async:1.6.681": {
-      "address": "3rdparty/jvm:core-async",
-      "namespaces": [
-        "clojure.core.async",
-        "clojure.core.async.impl.protocols",
-        "clojure.core.async.impl.channels"
-      ],
-      "source": "jar-analysis"
-    }
-  }
-}
-```
-
-**Fields:**
-- `version` - Metadata format version (for future evolution)
-- `resolve` - JVM resolve name (e.g., "default", "java17")
-- `lockfile` - Path to the corresponding lockfile
-- `lockfile_hash` - SHA256 hash for staleness detection
-- `artifacts` - Map of Maven coordinate to namespace info
-  - `address` - Pants address of the `jvm_artifact` target
-  - `namespaces` - List of Clojure namespaces provided by this artifact
-  - `source` - How namespaces were determined ("jar-analysis", "manual")
-
-## When to Regenerate Metadata
-
-You should regenerate the metadata files when:
-
-1. **Adding new dependencies** - Run `pants generate-lockfiles` then `pants generate-clojure-lockfile-metadata`
-2. **Updating dependency versions** - Same as above
-3. **Changing resolves** - If you modify your `jvm.resolves` configuration
-
-**Recommended workflow:**
-```bash
-# 1. Update your jvm_artifact targets in 3rdparty/jvm/BUILD
-# 2. Regenerate lockfiles
-pants generate-lockfiles ::
-
-# 3. Regenerate Clojure namespace metadata
-pants generate-clojure-lockfile-metadata ::
-
-# 4. Commit both lockfiles and metadata files
-git add 3rdparty/jvm/*.lock 3rdparty/jvm/*_clojure_namespaces.json
-git commit -m "Update dependencies"
-```
-
-## Version Control
-
-**Should you commit the metadata files?**
-
-**Yes, recommended!** The metadata files should be committed alongside your lockfiles because:
-
-✅ **Reproducible builds** - Everyone gets the same dependency inference
-✅ **Faster CI** - No need to regenerate metadata on every build
-✅ **Auditable** - You can see exactly what namespaces map to which artifacts
-✅ **Consistent with Pants patterns** - Similar to committing lockfiles
-
-Add to your `.gitignore` only if your team prefers to regenerate on-demand:
-```gitignore
-# Optional: Don't commit metadata (regenerate on-demand)
-*_clojure_namespaces.json
-```
 
 ## Advanced Features
 
@@ -206,13 +107,26 @@ If you use multiple JVM resolves (e.g., for different Java versions), the system
 resolves = { default = "3rdparty/jvm/default.lock", java17 = "3rdparty/jvm/java17.lock" }
 ```
 
-Running `pants generate-clojure-lockfile-metadata ::` generates metadata for all resolves:
-```
-3rdparty/jvm/default_clojure_namespaces.json
-3rdparty/jvm/java17_clojure_namespaces.json
+Each resolve gets its own namespace mappings, so you can have different versions of the same library in different resolves.
+
+### Manual Namespace Declarations
+
+You can explicitly declare which namespaces an artifact provides using the `packages` field:
+
+```python
+jvm_artifact(
+    name="cheshire",
+    group="cheshire",
+    artifact="cheshire",
+    version="5.11.0",
+    packages=["cheshire.**"],  # Matches cheshire and all sub-namespaces
+)
 ```
 
-Each resolve gets its own namespace mappings, so you can have different versions of the same library in different resolves.
+This is useful for:
+- Overriding automatic analysis results
+- Disambiguating when multiple artifacts provide the same namespace
+- Libraries that don't ship with Clojure source files
 
 ### AOT-Compiled JARs
 
@@ -247,61 +161,20 @@ clojure_source(
 
 ## Troubleshooting
 
-### Metadata file is stale
-
-**Problem:** You updated dependencies but forgot to regenerate metadata.
-
-**Solution:**
-```bash
-pants generate-clojure-lockfile-metadata ::
-```
-
 ### Namespace not being inferred
 
 **Checklist:**
-1. Did you run `generate-clojure-lockfile-metadata`?
-2. Is the metadata file present? Check for `*_clojure_namespaces.json`
-3. Is the artifact in your lockfile? Check `3rdparty/jvm/*.lock`
-4. Is there a first-party file with the same namespace? (First-party takes precedence)
-5. Check the metadata file - is the namespace listed?
+1. Is the artifact in your lockfile? Check `3rdparty/jvm/*.lock`
+2. Have you run `pants generate-lockfiles` after adding the dependency?
+3. Is there a first-party file with the same namespace? (First-party takes precedence)
 
-**Debug:**
-```bash
-# Check if metadata exists
-ls -la 3rdparty/jvm/*_clojure_namespaces.json
+### When to regenerate lockfiles
 
-# View metadata contents
-cat 3rdparty/jvm/default_clojure_namespaces.json | jq '.artifacts'
+You should regenerate lockfiles when:
 
-# Regenerate if needed
-pants generate-clojure-lockfile-metadata ::
-```
-
-### Build is slow after adding metadata
-
-The metadata files are loaded once and cached, so they should have minimal performance impact. The analysis only happens during `generate-clojure-lockfile-metadata`, not during normal builds.
-
-If builds are slow, it's likely unrelated to the metadata system. Check:
-- Are you using `--no-pantsd`? (Pantsd provides caching)
-- Are lockfiles very large? (>1000 dependencies)
-
-## Comparison with deps.edn
-
-If you're coming from a `deps.edn` workflow:
-
-| Feature | deps.edn | Pants with Metadata |
-|---------|----------|---------------------|
-| Third-party deps | Automatic | Automatic ✅ |
-| First-party deps | Manual (aliases) | Automatic ✅ |
-| Dependency management | git deps, Maven | Coursier lockfiles |
-| Multi-project | Requires configuration | Built-in monorepo support |
-| Incremental builds | Limited | Full dependency graph |
-
-The main difference is that Pants requires an extra step (`generate-clojure-lockfile-metadata`) after updating dependencies, but in exchange you get:
-- Reproducible builds with lockfiles
-- Automatic first-party dependency inference
-- Monorepo-scale performance
-- Integration with Java, Scala, and other JVM languages
+1. **Adding new dependencies** - Run `pants generate-lockfiles`
+2. **Updating dependency versions** - Same as above
+3. **Changing resolves** - If you modify your `jvm.resolves` configuration
 
 ## Examples
 
@@ -350,71 +223,14 @@ clojure_sources()  # All dependencies inferred automatically!
 
 Both `clojure.core.async` and `clojure.core.async.impl.protocols` map to the same `core-async` artifact, so only one dependency is inferred.
 
-## Migration Guide
+## Comparison with deps.edn
 
-If you have existing projects with manual third-party dependencies:
+If you're coming from a `deps.edn` workflow:
 
-### Before
-```python
-clojure_source(
-    name="api",
-    source="api.clj",
-    dependencies=[
-        "//src/util:core",           # First-party
-        "3rdparty/jvm:data-json",    # Third-party
-        "3rdparty/jvm:tools-logging", # Third-party
-    ],
-)
-```
-
-### After
-```python
-clojure_source(
-    name="api",
-    source="api.clj",
-    # All dependencies removed - automatic inference!
-)
-```
-
-Or use the generator:
-```python
-# Just this!
-clojure_sources()
-```
-
-**Migration steps:**
-1. Run `pants generate-clojure-lockfile-metadata ::`
-2. Remove third-party dependencies from BUILD files
-3. Keep explicit dependencies only for:
-   - Java-only libraries (no Clojure namespaces)
-   - Disambiguating ambiguous namespaces
-   - Overriding automatic inference
-4. Run `pants check ::` to verify everything works
-5. Commit changes
-
-## Future Enhancements
-
-Planned features:
-
-- **Manual namespace override** - Add `clojure_namespaces` field to `jvm_artifact` for manual specification
-- **Staleness auto-detection** - Automatic warnings when metadata is out of sync with lockfiles
-- **ClojureScript support** - Extend to `.cljs` files
-- **Integration with generate-lockfiles** - Automatically generate metadata when lockfiles are generated
-
-## Summary
-
-Third-party Clojure dependency inference provides:
-
-✅ **Automatic inference** - No manual `dependencies` for third-party Clojure libraries
-✅ **Fast builds** - Pre-computed metadata, no runtime overhead
-✅ **Reproducible** - Version-controlled metadata ensures consistency
-✅ **Precedence** - First-party sources always take priority
-✅ **Multi-resolve support** - Works with multiple Java versions
-✅ **AOT support** - Handles both source and compiled JARs
-
-**Get started:**
-```bash
-pants generate-lockfiles ::
-pants generate-clojure-lockfile-metadata ::
-# Now all third-party Clojure dependencies are automatically inferred!
-```
+| Feature | deps.edn | Pants |
+|---------|----------|-------|
+| Third-party deps | Automatic | Automatic |
+| First-party deps | Manual (aliases) | Automatic |
+| Dependency management | git deps, Maven | Coursier lockfiles |
+| Multi-project | Requires configuration | Built-in monorepo support |
+| Incremental builds | Limited | Full dependency graph |

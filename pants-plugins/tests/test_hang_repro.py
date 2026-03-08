@@ -1,32 +1,7 @@
-"""Minimal reproduction of test hang issue.
+"""Regression tests for the check goal hang caused by nested await Get() calls.
 
-This test reproduces the hang that occurs when tests run for too long.
-The hang is triggered by specific combinations of:
-1. clojure_source depending on jvm_artifact(clojure)
-2. Using check or AOT compile goals
-
-FINDINGS:
-=========
-The hang is reproduced by this test. After investigation, a potential root cause
-was identified in check.py and aot_compile.py:
-
-PROBLEMATIC PATTERN (check.py:189, aot_compile.py:162):
-    result = await Get(FallibleProcessResult, Process, await Get(Process, JvmProcess, jvm_process))
-
-This nested `await Get()` violates the Pants Engine's async patterns. The scheduler
-may deadlock waiting for the nested Get to complete while holding locks.
-
-CORRECT PATTERN (used in test.py:199-202):
-    process = await Get(Process, JvmProcess, test_setup.process)
-    process_results = await Get(ProcessResultWithRetries, ProcessWithRetries(process, ...))
-
-The test runner (test.py) works correctly because it uses sequential Get() calls
-instead of nested ones.
-
-NEXT STEP:
-Fix the nested await Get() pattern in:
-- pants-plugins/pants_backend_clojure/aot_compile.py:162
-- pants-plugins/pants_backend_clojure/goals/check.py:189
+The root cause was nested `await Get()` in check.py and aot_compile.py which
+violated the Pants Engine's async patterns, causing scheduler deadlocks.
 """
 
 from __future__ import annotations
@@ -194,15 +169,8 @@ _JVM_RESOLVES = {
 }
 
 
-def test_check_with_clojure_dependency(rule_runner: RuleRunner) -> None:
-    """Minimal test that reproduces the hang.
-
-    This test:
-    1. Creates a clojure_source that depends on jvm_artifact(clojure)
-    2. Runs the check goal on that source
-
-    This is the minimal reproduction of the hang issue.
-    """
+def test_check_does_not_hang_with_clojure_dependency(rule_runner: RuleRunner) -> None:
+    """Verify that check goal completes when source depends on jvm_artifact(clojure)."""
     rule_runner.write_files(
         {
             "3rdparty/jvm/BUILD": dedent(
@@ -247,16 +215,8 @@ def test_check_with_clojure_dependency(rule_runner: RuleRunner) -> None:
     assert results.results[0].exit_code == 0
 
 
-# =============================================================================
-# PROGRESSIVE TEST VARIANTS FOR BISECTION (Phase 1 of debugging plan)
-# =============================================================================
-
-
-def test_a_targets_only(rule_runner: RuleRunner) -> None:
-    """Test A: Just create targets (no rule execution).
-
-    If this hangs -> target parsing issue
-    """
+def test_check_does_not_hang_with_target_creation_only(rule_runner: RuleRunner) -> None:
+    """Verify that target creation alone does not hang."""
     rule_runner.write_files(
         {
             "3rdparty/jvm/BUILD": dedent(
@@ -287,17 +247,12 @@ def test_a_targets_only(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    # Just get the target - no rule execution
     tgt = rule_runner.get_target(Address(spec_path="", target_name="example"))
     assert tgt is not None
-    print(f"Target created successfully: {tgt}")
 
 
-def test_b_classpath_only(rule_runner: RuleRunner) -> None:
-    """Test C: Resolve classpath without check goal.
-
-    If this hangs -> classpath/coursier issue
-    """
+def test_check_does_not_hang_with_classpath_resolution(rule_runner: RuleRunner) -> None:
+    """Verify that classpath resolution alone does not hang."""
     rule_runner.write_files(
         {
             "3rdparty/jvm/BUILD": dedent(
@@ -328,20 +283,15 @@ def test_b_classpath_only(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    # Resolve classpath
     classpath = rule_runner.request(
         Classpath,
         [Addresses([Address(spec_path="", target_name="example")])]
     )
-    print(f"Classpath entries: {classpath.args()}")
     assert classpath is not None
 
 
-def test_c_check_no_artifact_dep(rule_runner: RuleRunner) -> None:
-    """Test D: Check goal with clojure_source but NO jvm_artifact dependency.
-
-    If this hangs -> check goal issue unrelated to artifacts
-    """
+def test_check_does_not_hang_without_artifact_dependency(rule_runner: RuleRunner) -> None:
+    """Verify that check goal completes when source has no jvm_artifact dependency."""
     rule_runner.write_files(
         {
             "3rdparty/jvm/BUILD": dedent(
@@ -375,12 +325,9 @@ def test_c_check_no_artifact_dep(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address(spec_path="", target_name="example"))
     field_set = ClojureCheckFieldSet.create(tgt)
 
-    # Run check goal - no artifact dependency
     results = rule_runner.request(
         CheckResults,
         [ClojureCheckRequest([field_set])],
     )
 
-    # This may fail because Clojure isn't on classpath, but it shouldn't hang
-    print(f"Check results: {results}")
     assert len(results.results) == 1

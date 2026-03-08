@@ -449,8 +449,8 @@ async def load_clojure_namespace_mapping(
 async def _load_legacy_metadata_files() -> dict[tuple[str, str], tuple[Address, ...]]:
     """Load legacy *_clojure_namespaces.json metadata files.
 
-    This provides backwards compatibility for users who have generated
-    metadata files using the generate-clojure-lockfile-metadata goal.
+    This provides backwards compatibility for users who have existing
+    *_clojure_namespaces.json metadata files in their repository.
 
     Returns:
         Mapping from (namespace, resolve) to tuple of addresses.
