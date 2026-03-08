@@ -17,7 +17,7 @@ AI coding tools are great when used properly. I've found them particularly usefu
 in a domain that is largely unfamiliar to me, but I don't have the time to gain deep mastery of everything.
 That's basically what's happened here. I've written a lot of Clojure code in my life. I've been working with the Pants build tool
 for a few years now and I've written many internal plugins for it. This is my first attempt at creating something that has use
-and value to the outside world. I've used Claude to write all of the code. I've verified much, but not all of it myself.
+and value to the outside world. I've used Claude to write all of the code.
 
 I'm "dogfooding" this project though and using that experience as my main method of verifying this project and driving it forward.
 However, I'd very much welcome input from others who see value in this. Feel free to try it out and let me know what you think.
@@ -39,7 +39,7 @@ Pants addresses both of these issues. Pants registers each source file as a targ
 It also provides "resolves" which you can think of as a combination of your target runtime (i.e. Java 21) and a lockfile of third party dependencies.
 Every source target belongs to one or more resolves. Suppose you have some common source that needs to work with other first party sources in both Java 8 and Java 21 and against different versions of some way-too-common library like Guava. You'd assign this hypothetical source to both resolves. Its unit tests would run in both resolves. Bugs that might exist in one runtime, but not the other would be caught and surfaced quickly. Also, Pants has the ability to detect first and third party dependencies automatically. So you no longer have to look at a long list of project dependency lines and wonder which ones you can safely remove. Just specify nothing and let Pants figure it out for you.
 
-This is all wonderful and I've felt for awhile now that it was the missing piece for large Clojure project. So I went out and built it.
+This is all wonderful and I've felt for awhile now that it was the missing piece for large Clojure projects. So I went out and built it.
 I'm using it now. I'm incredibly happy with the results.
 
 NOTE: I've yet to implement the part where Pants infers third party dependencies for you automatically in this plugin. It's on my todo list. First party dependency inference works though.
@@ -63,7 +63,7 @@ Add the plugin to your `pants.toml`:
 
 ```toml
 [GLOBAL]
-pants_version = "2.29.0"
+pants_version = "2.30.0"
 plugins = ["pants-backend-clojure==0.1.0"]
 backend_packages = [
     "pants.backend.experimental.java",
@@ -237,7 +237,7 @@ clojure_source(
 ## System Requirements
 
 - **Python**: 3.9+
-- **Pants**: 2.20.0+
+- **Pants**: 2.30.0+
 - **JDK**: 11+ (17 or 21 recommended)
 - **zip/unzip**: Required for clj-kondo
   - macOS: Pre-installed
