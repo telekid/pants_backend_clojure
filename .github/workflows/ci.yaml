@@ -38,6 +38,9 @@ jobs:
       - name: Run tests
         run: pants test pants-plugins::
 
+      - name: Package wheel
+        run: pants package pants-plugins:wheel
+
       - name: Upload pants.log
         if: always()
         uses: actions/upload-artifact@v4
