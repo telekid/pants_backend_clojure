@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import pytest
-
-from pants_backend_clojure.subsystems.tools_build import (
-    ToolsBuildClasspathRequest,
-    ToolsBuildSubsystem,
-    rules as tools_build_rules,
-)
 from pants.engine.rules import QueryRule
 from pants.jvm.resolve import coursier_fetch
 from pants.jvm.resolve.coursier_fetch import ToolClasspath
 from pants.testutil.rule_runner import RuleRunner
+from pants_backend_clojure.subsystems.tools_build import (
+    ToolsBuildClasspathRequest,
+)
+from pants_backend_clojure.subsystems.tools_build import (
+    rules as tools_build_rules,
+)
 
 
 @pytest.fixture
@@ -38,12 +38,8 @@ def test_fetch_tools_build_classpath(rule_runner: RuleRunner) -> None:
     assert len(classpath_entries) > 0
 
     # Verify tools.build is in the classpath
-    tools_build_jars = [
-        entry for entry in classpath_entries if "tools.build" in entry
-    ]
-    assert len(tools_build_jars) > 0, (
-        f"Expected tools.build JAR in classpath, got: {classpath_entries}"
-    )
+    tools_build_jars = [entry for entry in classpath_entries if "tools.build" in entry]
+    assert len(tools_build_jars) > 0, f"Expected tools.build JAR in classpath, got: {classpath_entries}"
 
 
 def test_tools_build_version_option(rule_runner: RuleRunner) -> None:
@@ -56,9 +52,5 @@ def test_tools_build_version_option(rule_runner: RuleRunner) -> None:
 
     # Verify the specified version is fetched
     classpath_entries = list(result.classpath_entries())
-    version_match = [
-        entry for entry in classpath_entries if "0.10.5" in entry
-    ]
-    assert len(version_match) > 0, (
-        f"Expected tools.build version 0.10.5 in classpath, got: {classpath_entries}"
-    )
+    version_match = [entry for entry in classpath_entries if "0.10.5" in entry]
+    assert len(version_match) > 0, f"Expected tools.build version 0.10.5 in classpath, got: {classpath_entries}"

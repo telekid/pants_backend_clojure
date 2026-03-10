@@ -3,15 +3,6 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
-from pants_backend_clojure.goals.lint import CljKondoRequest
-from pants_backend_clojure.goals.lint import rules as lint_rules
-from pants_backend_clojure.target_types import (
-    ClojureSourcesGeneratorTarget,
-    ClojureSourceTarget,
-    ClojureTestTarget,
-)
-from pants_backend_clojure.target_types import rules as target_types_rules
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -23,6 +14,14 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as jdk_util_rules
 from pants.testutil.rule_runner import RuleRunner
+from pants_backend_clojure.goals.lint import CljKondoRequest
+from pants_backend_clojure.goals.lint import rules as lint_rules
+from pants_backend_clojure.target_types import (
+    ClojureSourcesGeneratorTarget,
+    ClojureSourceTarget,
+    ClojureTestTarget,
+)
+from pants_backend_clojure.target_types import rules as target_types_rules
 
 
 @pytest.fixture
@@ -68,10 +67,7 @@ def run_clj_kondo(
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    field_sets = [
-        CljKondoRequest.field_set_type.create(rule_runner.get_target(address))
-        for address in targets
-    ]
+    field_sets = [CljKondoRequest.field_set_type.create(rule_runner.get_target(address)) for address in targets]
     input_sources = rule_runner.request(
         SourceFiles,
         [SourceFilesRequest(field_set.sources for field_set in field_sets)],

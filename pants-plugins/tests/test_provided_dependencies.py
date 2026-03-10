@@ -5,26 +5,24 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
-from pants_backend_clojure.provided_dependencies import (
-    ProvidedDependencies,
-    ResolveProvidedDependenciesRequest,
-    get_maven_transitive_coordinates,
-    resolve_provided_dependencies,
-)
-from pants_backend_clojure.provided_dependencies import rules as provided_dependencies_rules
-from pants_backend_clojure.target_types import (
-    ClojureProvidedDependenciesField,
-    ClojureDeployJarTarget,
-    ClojureSourceTarget,
-)
-from pants_backend_clojure.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.engine.rules import QueryRule
 from pants.jvm import classpath, jvm_common
 from pants.jvm.resolve import coursier_fetch, jvm_tool
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.testutil.rule_runner import RuleRunner
+from pants_backend_clojure.provided_dependencies import (
+    ProvidedDependencies,
+    ResolveProvidedDependenciesRequest,
+    get_maven_transitive_coordinates,
+)
+from pants_backend_clojure.provided_dependencies import rules as provided_dependencies_rules
+from pants_backend_clojure.target_types import (
+    ClojureDeployJarTarget,
+    ClojureProvidedDependenciesField,
+    ClojureSourceTarget,
+)
+from pants_backend_clojure.target_types import rules as target_types_rules
 
 
 @pytest.fixture
@@ -69,17 +67,14 @@ def test_empty_provided_dependencies(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "src/hello/core.clj": "(ns hello.core (:gen-class))\n\n(defn -main [& args] (println \"Hello\"))",
+            "src/hello/core.clj": '(ns hello.core (:gen-class))\n\n(defn -main [& args] (println "Hello"))',
         }
     )
 
     target = rule_runner.get_target(Address("src/hello", target_name="app"))
     field = target[ClojureProvidedDependenciesField]
 
-    result = rule_runner.request(
-        ProvidedDependencies,
-        [ResolveProvidedDependenciesRequest(field, "java17")]
-    )
+    result = rule_runner.request(ProvidedDependencies, [ResolveProvidedDependenciesRequest(field, "java17")])
 
     assert len(result.addresses) == 0
     assert len(result.coordinates) == 0
@@ -119,10 +114,7 @@ def test_single_provided_dependency_no_transitives(rule_runner: RuleRunner) -> N
     target = rule_runner.get_target(Address("src/lib", target_name="app"))
     field = target[ClojureProvidedDependenciesField]
 
-    result = rule_runner.request(
-        ProvidedDependencies,
-        [ResolveProvidedDependenciesRequest(field, "java17")]
-    )
+    result = rule_runner.request(ProvidedDependencies, [ResolveProvidedDependenciesRequest(field, "java17")])
 
     # Should include just the api target
     assert len(result.addresses) == 1
@@ -178,10 +170,7 @@ def test_provided_dependency_with_transitives(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src/app", target_name="app"))
     field = target[ClojureProvidedDependenciesField]
 
-    result = rule_runner.request(
-        ProvidedDependencies,
-        [ResolveProvidedDependenciesRequest(field, "java17")]
-    )
+    result = rule_runner.request(ProvidedDependencies, [ResolveProvidedDependenciesRequest(field, "java17")])
 
     # Should include both api:interface and its transitive dependency base:util
     assert len(result.addresses) == 2
@@ -235,10 +224,7 @@ def test_multiple_provided_dependencies(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src/app", target_name="app"))
     field = target[ClojureProvidedDependenciesField]
 
-    result = rule_runner.request(
-        ProvidedDependencies,
-        [ResolveProvidedDependenciesRequest(field, "java17")]
-    )
+    result = rule_runner.request(ProvidedDependencies, [ResolveProvidedDependenciesRequest(field, "java17")])
 
     # Should include both api libraries
     assert len(result.addresses) == 2
@@ -303,10 +289,7 @@ def test_provided_dependency_with_shared_transitive(rule_runner: RuleRunner) -> 
     target = rule_runner.get_target(Address("src/app", target_name="app"))
     field = target[ClojureProvidedDependenciesField]
 
-    result = rule_runner.request(
-        ProvidedDependencies,
-        [ResolveProvidedDependenciesRequest(field, "java17")]
-    )
+    result = rule_runner.request(ProvidedDependencies, [ResolveProvidedDependenciesRequest(field, "java17")])
 
     # Should include api1, api2, and their shared common.util dependency
     assert len(result.addresses) == 3
@@ -365,10 +348,7 @@ def test_deep_transitive_chain(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src/app", target_name="app"))
     field = target[ClojureProvidedDependenciesField]
 
-    result = rule_runner.request(
-        ProvidedDependencies,
-        [ResolveProvidedDependenciesRequest(field, "java17")]
-    )
+    result = rule_runner.request(ProvidedDependencies, [ResolveProvidedDependenciesRequest(field, "java17")])
 
     # Should include the entire transitive chain: c -> b -> a
     assert len(result.addresses) == 3
@@ -404,10 +384,7 @@ def test_provided_dependencies_field_not_set(rule_runner: RuleRunner) -> None:
     # Get the field even though it wasn't set (should have empty value)
     field = target.get(ClojureProvidedDependenciesField)
 
-    result = rule_runner.request(
-        ProvidedDependencies,
-        [ResolveProvidedDependenciesRequest(field, "java17")]
-    )
+    result = rule_runner.request(ProvidedDependencies, [ResolveProvidedDependenciesRequest(field, "java17")])
 
     assert len(result.addresses) == 0
     assert len(result.coordinates) == 0
@@ -471,17 +448,14 @@ def test_jvm_artifact_provided_dependency(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "src/hello/core.clj": "(ns hello.core (:gen-class))\n\n(defn -main [& args] (println \"Hello\"))",
+            "src/hello/core.clj": '(ns hello.core (:gen-class))\n\n(defn -main [& args] (println "Hello"))',
         }
     )
 
     target = rule_runner.get_target(Address("src/hello", target_name="app"))
     field = target[ClojureProvidedDependenciesField]
 
-    result = rule_runner.request(
-        ProvidedDependencies,
-        [ResolveProvidedDependenciesRequest(field, "java17")]
-    )
+    result = rule_runner.request(ProvidedDependencies, [ResolveProvidedDependenciesRequest(field, "java17")])
 
     # Should include the jvm_artifact address
     assert len(result.addresses) == 1
@@ -600,17 +574,14 @@ def test_maven_transitive_simple(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "src/hello/core.clj": "(ns hello.core (:gen-class))\n\n(defn -main [& args] (println \"Hello\"))",
+            "src/hello/core.clj": '(ns hello.core (:gen-class))\n\n(defn -main [& args] (println "Hello"))',
         }
     )
 
     target = rule_runner.get_target(Address("src/hello", target_name="app"))
     field = target[ClojureProvidedDependenciesField]
 
-    result = rule_runner.request(
-        ProvidedDependencies,
-        [ResolveProvidedDependenciesRequest(field, "java17")]
-    )
+    result = rule_runner.request(ProvidedDependencies, [ResolveProvidedDependenciesRequest(field, "java17")])
 
     # Should include the jvm_artifact address
     assert len(result.addresses) == 1
@@ -760,10 +731,7 @@ def test_maven_transitive_diamond(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src/app", target_name="app"))
     field = target[ClojureProvidedDependenciesField]
 
-    result = rule_runner.request(
-        ProvidedDependencies,
-        [ResolveProvidedDependenciesRequest(field, "java17")]
-    )
+    result = rule_runner.request(ProvidedDependencies, [ResolveProvidedDependenciesRequest(field, "java17")])
 
     # Should include guava and its transitives, but NOT j2objc
     assert ("com.google.guava", "guava") in result.coordinates
@@ -821,10 +789,7 @@ def test_maven_transitive_with_first_party(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src/app", target_name="app"))
     field = target[ClojureProvidedDependenciesField]
 
-    result = rule_runner.request(
-        ProvidedDependencies,
-        [ResolveProvidedDependenciesRequest(field, "java17")]
-    )
+    result = rule_runner.request(ProvidedDependencies, [ResolveProvidedDependenciesRequest(field, "java17")])
 
     # Should include both first-party address and jvm_artifact
     assert Address("src/api", target_name="interface") in result.addresses

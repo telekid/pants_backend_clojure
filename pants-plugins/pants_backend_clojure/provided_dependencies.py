@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
-from pants.engine.fs import Digest, DigestContents, PathGlobs
+from pants.engine.addresses import Address, Addresses
+from pants.engine.fs import PathGlobs
 from pants.engine.internals.graph import (
     resolve_targets,
     resolve_unparsed_address_inputs,
@@ -11,7 +11,7 @@ from pants.engine.internals.graph import (
 )
 from pants.engine.intrinsics import get_digest_contents, path_globs_to_digest
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
-from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import TransitiveTargetsRequest
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmArtifactArtifactField, JvmArtifactGroupField
@@ -34,6 +34,7 @@ class ProvidedDependencies:
         addresses: Pants addresses to exclude (for first-party source filtering)
         coordinates: Maven groupId:artifactId pairs to exclude (for third-party JAR filtering)
     """
+
     addresses: FrozenOrderedSet[Address]
     coordinates: FrozenOrderedSet[tuple[str, str]]  # (group_id, artifact_id)
 
@@ -41,14 +42,12 @@ class ProvidedDependencies:
 @dataclass(frozen=True)
 class ResolveProvidedDependenciesRequest:
     """Request to resolve provided dependencies for a specific JVM resolve."""
+
     field: ClojureProvidedDependenciesField
     resolve_name: str | None  # None when only first-party sources are provided
 
 
-def get_maven_transitive_coordinates(
-    lockfile: CoursierResolvedLockfile,
-    coordinates: set[tuple[str, str]]
-) -> set[tuple[str, str]]:
+def get_maven_transitive_coordinates(lockfile: CoursierResolvedLockfile, coordinates: set[tuple[str, str]]) -> set[tuple[str, str]]:
     """Get full transitive closure of Maven coordinates from lockfile.
 
     Simply looks up each coordinate in the lockfile and collects the
@@ -120,8 +119,7 @@ async def resolve_provided_dependencies(
 
     # Get the transitive closure for each provided dependency
     all_transitive = await concurrently(
-        transitive_targets(TransitiveTargetsRequest([target.address]), **implicitly())
-        for target in provided_targets
+        transitive_targets(TransitiveTargetsRequest([target.address]), **implicitly()) for target in provided_targets
     )
 
     # Collect all addresses (both roots and their transitive dependencies)

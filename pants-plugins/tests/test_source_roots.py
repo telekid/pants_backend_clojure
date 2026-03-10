@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from pants_backend_clojure.utils.source_roots import determine_source_root
 
 
@@ -22,17 +20,13 @@ def test_determine_source_root_nested_namespace() -> None:
 
 def test_determine_source_root_hyphen_to_underscore() -> None:
     """Test that hyphens in namespaces are converted to underscores in paths."""
-    result = determine_source_root(
-        "src/example/project_a/core.clj", "example.project-a.core"
-    )
+    result = determine_source_root("src/example/project_a/core.clj", "example.project-a.core")
     assert result == "src"
 
 
 def test_determine_source_root_cljc_files() -> None:
     """Test source root determination with .cljc files."""
-    result = determine_source_root(
-        "src/example/multiplatform.cljc", "example.multiplatform"
-    )
+    result = determine_source_root("src/example/multiplatform.cljc", "example.multiplatform")
     assert result == "src"
 
 
@@ -59,9 +53,7 @@ def test_determine_source_root_no_subdirectory() -> None:
 
 def test_determine_source_root_complex_hyphenated_namespace() -> None:
     """Test namespace with multiple hyphens."""
-    result = determine_source_root(
-        "src/my_app/db_utils/connection_pool.clj", "my-app.db-utils.connection-pool"
-    )
+    result = determine_source_root("src/my_app/db_utils/connection_pool.clj", "my-app.db-utils.connection-pool")
     assert result == "src"
 
 

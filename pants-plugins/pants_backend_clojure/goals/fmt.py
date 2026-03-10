@@ -2,20 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest, find_config_file
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.util_rules.config_files import ConfigFilesRequest, find_config_file
 from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
     download_external_tool,
 )
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import MergeDigests
 from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize

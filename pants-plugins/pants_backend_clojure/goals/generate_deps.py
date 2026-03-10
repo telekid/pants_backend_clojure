@@ -13,7 +13,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.intrinsics import create_digest, get_digest_contents, path_globs_to_digest
-from pants.engine.rules import collect_rules, concurrently, implicitly, goal_rule
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly
 from pants.engine.target import AllTargets
 from pants.jvm.resolve.coursier_setup import CoursierSubsystem
 from pants.jvm.subsystems import JvmSubsystem
@@ -69,8 +69,7 @@ See docs/plans/20251015_repl_redesign.md for more details.
 
     resolve = StrOption(
         default=None,
-        help="The JVM resolve to generate deps.edn for (e.g., 'java21', 'java17'). "
-        "If not specified, uses the default resolve.",
+        help="The JVM resolve to generate deps.edn for (e.g., 'java21', 'java17'). If not specified, uses the default resolve.",
     )
 
     output_path = StrOption(
@@ -230,9 +229,7 @@ class ClojureSourcesInfo:
     test_paths: set[str]
 
 
-async def gather_clojure_sources_for_resolve(
-    all_targets: AllTargets, jvm: JvmSubsystem, resolve_name: str
-) -> ClojureSourcesInfo:
+async def gather_clojure_sources_for_resolve(all_targets: AllTargets, jvm: JvmSubsystem, resolve_name: str) -> ClojureSourcesInfo:
     """Gather all Clojure source and test paths for a specific resolve.
 
     Note: This function intentionally only includes Clojure sources, not Java or Scala.
@@ -268,22 +265,15 @@ async def gather_clojure_sources_for_resolve(
             test_targets.append(target)
 
     # Fetch source files for all targets in parallel
-    source_file_requests = [
-        SourceFilesRequest([t[ClojureSourceField]]) for t in source_targets
-    ] + [
+    source_file_requests = [SourceFilesRequest([t[ClojureSourceField]]) for t in source_targets] + [
         SourceFilesRequest([t[ClojureTestSourceField]]) for t in test_targets
     ]
 
-    all_source_files = await concurrently(
-        determine_source_files(req) for req in source_file_requests
-    )
+    all_source_files = await concurrently(determine_source_files(req) for req in source_file_requests)
 
     # Use clj-kondo analysis to extract namespaces
     all_analyses = await concurrently(
-        analyze_clojure_namespaces(
-            ClojureNamespaceAnalysisRequest(sf.snapshot), **implicitly()
-        )
-        for sf in all_source_files
+        analyze_clojure_namespaces(ClojureNamespaceAnalysisRequest(sf.snapshot), **implicitly()) for sf in all_source_files
     )
 
     # Determine source roots
@@ -366,17 +356,13 @@ def format_deps_edn(
         test_paths_str = '["' + '"\n                         "'.join(test_paths) + '"]'
     else:
         test_paths_str = "[]"
-    aliases_content.append(f'  :test {{:extra-paths {test_paths_str}}}')
+    aliases_content.append(f"  :test {{:extra-paths {test_paths_str}}}")
 
     # Add nREPL alias
-    aliases_content.append(
-        '  :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.4.0" :exclusions [*/*]}}}'
-    )
+    aliases_content.append('  :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.4.0" :exclusions [*/*]}}}')
 
     # Add rebel-readline alias
-    aliases_content.append(
-        '  :rebel {:extra-deps {com.bhauman/rebel-readline {:mvn/version "0.1.4" :exclusions [*/*]}}}'
-    )
+    aliases_content.append('  :rebel {:extra-deps {com.bhauman/rebel-readline {:mvn/version "0.1.4" :exclusions [*/*]}}}')
 
     aliases_str = "{\n" + "\n".join(aliases_content) + "}"
 
@@ -420,9 +406,7 @@ async def generate_deps_edn_goal(
     # Validate resolve exists
     if resolve_name not in jvm.resolves:
         available = ", ".join(jvm.resolves.keys())
-        console.print_stderr(
-            f"Error: Resolve '{resolve_name}' not found. Available resolves: {available}"
-        )
+        console.print_stderr(f"Error: Resolve '{resolve_name}' not found. Available resolves: {available}")
         return GenerateDepsEdn(exit_code=1)
 
     console.print_stdout(f"Generating deps.edn for resolve: {resolve_name}")
@@ -450,19 +434,12 @@ async def generate_deps_edn_goal(
 
     # Gather Clojure sources for this resolve
     console.print_stdout(f"Gathering Clojure sources for resolve '{resolve_name}'...")
-    sources_info = await gather_clojure_sources_for_resolve(
-        all_targets, jvm, resolve_name
-    )
+    sources_info = await gather_clojure_sources_for_resolve(all_targets, jvm, resolve_name)
 
-    console.print_stdout(
-        f"Found {len(sources_info.source_paths)} source roots and "
-        f"{len(sources_info.test_paths)} test roots"
-    )
+    console.print_stdout(f"Found {len(sources_info.source_paths)} source roots and {len(sources_info.test_paths)} test roots")
 
     # Format deps.edn content
-    deps_edn_content = format_deps_edn(
-        sources_info, lock_entries, resolve_name, repos=coursier.repos
-    )
+    deps_edn_content = format_deps_edn(sources_info, lock_entries, resolve_name, repos=coursier.repos)
 
     # Write to file
     output_path = subsystem.output_path
@@ -476,10 +453,10 @@ async def generate_deps_edn_goal(
     workspace.write_digest(output_digest)
 
     console.print_stdout(f"\nSuccessfully generated {output_path}")
-    console.print_stdout(f"\nYou can now use standard Clojure tooling:")
-    console.print_stdout(f"  clj -M:nrepl -m nrepl.server      # Start nREPL server")
-    console.print_stdout(f"  clj -M:rebel                      # Start Rebel Readline REPL")
-    console.print_stdout(f"  # Or open project in Cursive/Calva")
+    console.print_stdout("\nYou can now use standard Clojure tooling:")
+    console.print_stdout("  clj -M:nrepl -m nrepl.server      # Start nREPL server")
+    console.print_stdout("  clj -M:rebel                      # Start Rebel Readline REPL")
+    console.print_stdout("  # Or open project in Cursive/Calva")
 
     return GenerateDepsEdn(exit_code=0)
 

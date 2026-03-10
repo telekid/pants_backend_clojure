@@ -5,13 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.core.util_rules.source_files import (
-    SourceFiles,
     SourceFilesRequest,
     determine_source_files,
 )
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import (
-    Owners,
     OwnersRequest,
     determine_explicitly_provided_dependencies,
     find_owners,
@@ -19,12 +17,10 @@ from pants.engine.internals.graph import (
 )
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
-    ExplicitlyProvidedDependencies,
     ExplicitlyProvidedDependenciesRequest,
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
-    Targets,
 )
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
@@ -36,15 +32,12 @@ from pants.util.ordered_set import OrderedSet
 
 from pants_backend_clojure.clojure_symbol_mapping import ClojureNamespaceMapping
 from pants_backend_clojure.namespace_analysis import (
-    ClojureNamespaceAnalysis,
     ClojureNamespaceAnalysisRequest,
     analyze_clojure_namespaces,
 )
 from pants_backend_clojure.target_types import (
     ClojureSourceField,
-    ClojureSourceTarget,
     ClojureTestSourceField,
-    ClojureTestTarget,
 )
 from pants_backend_clojure.utils.namespace_parser import (
     is_jdk_class,

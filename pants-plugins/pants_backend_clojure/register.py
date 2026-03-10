@@ -8,7 +8,6 @@ from pants_backend_clojure import (
     provided_dependencies,
     tools_build_uberjar,
 )
-from pants_backend_clojure.subsystems import clojure_infer, tools_build
 from pants_backend_clojure.goals import (
     check,
     fmt,
@@ -18,12 +17,15 @@ from pants_backend_clojure.goals import (
     repl,
     test,
 )
+from pants_backend_clojure.subsystems import clojure_infer, tools_build
 from pants_backend_clojure.target_types import (
     ClojureDeployJarTarget,
-    ClojureSourceTarget,
     ClojureSourcesGeneratorTarget,
-    ClojureTestTarget,
+    ClojureSourceTarget,
     ClojureTestsGeneratorTarget,
+    ClojureTestTarget,
+)
+from pants_backend_clojure.target_types import (
     rules as target_type_rules,
 )
 

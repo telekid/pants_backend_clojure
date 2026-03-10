@@ -3,16 +3,6 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
-from pants_backend_clojure.goals.check import ClojureCheckFieldSet, ClojureCheckRequest
-from pants_backend_clojure.goals import check as check_goal
-from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
-from pants_backend_clojure.target_types import (
-    ClojureSourcesGeneratorTarget,
-    ClojureSourceTarget,
-)
-from pants_backend_clojure.target_types import rules as target_types_rules
-from pants_backend_clojure import compile_clj
 from pants.core.goals.check import CheckResults
 from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Address
@@ -23,8 +13,16 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as jdk_util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
-
-from tests.clojure_test_fixtures import CLOJURE_LOCKFILE, CLOJURE_3RDPARTY_BUILD
+from pants_backend_clojure import compile_clj
+from pants_backend_clojure.goals import check as check_goal
+from pants_backend_clojure.goals.check import ClojureCheckFieldSet, ClojureCheckRequest
+from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
+from pants_backend_clojure.target_types import (
+    ClojureSourcesGeneratorTarget,
+    ClojureSourceTarget,
+)
+from pants_backend_clojure.target_types import rules as target_types_rules
+from tests.clojure_test_fixtures import CLOJURE_3RDPARTY_BUILD, CLOJURE_LOCKFILE
 
 
 @pytest.fixture
@@ -64,8 +62,6 @@ _JVM_RESOLVES = {
 }
 
 
-
-
 def run_clojure_check(
     rule_runner: RuleRunner,
     target_name: str,
@@ -79,9 +75,7 @@ def run_clojure_check(
         *(extra_args or []),
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path))
     field_set = ClojureCheckFieldSet.create(tgt)
     return rule_runner.request(
         CheckResults,

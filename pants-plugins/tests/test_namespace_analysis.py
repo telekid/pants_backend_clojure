@@ -5,16 +5,15 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
+from pants.core.util_rules import config_files, external_tool, source_files
+from pants.engine.rules import QueryRule
+from pants.testutil.rule_runner import RuleRunner
 from pants_backend_clojure.namespace_analysis import (
     ClojureNamespaceAnalysis,
     ClojureNamespaceAnalysisRequest,
 )
 from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
 from pants_backend_clojure.target_types import ClojureSourceTarget
-from pants.core.util_rules import config_files, external_tool, source_files
-from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.fixture
@@ -389,10 +388,7 @@ def test_comment_form_requires_included_without_config(rule_runner: RuleRunner) 
     # Without skip-comments config, clojure.set from comment form should be included
     requires = analysis.requires.get("example.clj", ())
     assert "clojure.string" in requires
-    assert "clojure.set" in requires, (
-        "clojure.set should be included when :skip-comments is not set - "
-        "this is the baseline behavior"
-    )
+    assert "clojure.set" in requires, "clojure.set should be included when :skip-comments is not set - this is the baseline behavior"
 
 
 def test_config_file_skip_comments_is_respected(rule_runner: RuleRunner) -> None:
@@ -426,10 +422,12 @@ def test_config_file_skip_comments_is_respected(rule_runner: RuleRunner) -> None
 
     # Create snapshot including both source file AND config file
     # This simulates what happens when ConfigFilesRequest successfully finds the config
-    snapshot = rule_runner.make_snapshot({
-        ".clj-kondo/config.edn": "{:skip-comments true}",
-        "example.clj": source_content,
-    })
+    snapshot = rule_runner.make_snapshot(
+        {
+            ".clj-kondo/config.edn": "{:skip-comments true}",
+            "example.clj": source_content,
+        }
+    )
 
     analysis = rule_runner.request(
         ClojureNamespaceAnalysis,

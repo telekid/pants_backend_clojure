@@ -81,10 +81,7 @@ class CljKondo(ExternalTool):
             raise ValueError(f"Unsupported platform: {plat.value}")
 
         version = self.version
-        return (
-            f"https://github.com/clj-kondo/clj-kondo/releases/download/"
-            f"v{version}/clj-kondo-{version}-{platform_str}.zip"
-        )
+        return f"https://github.com/clj-kondo/clj-kondo/releases/download/v{version}/clj-kondo-{version}-{platform_str}.zip"
 
     def generate_exe(self, _plat: Platform) -> str:
         """The executable name after extraction."""

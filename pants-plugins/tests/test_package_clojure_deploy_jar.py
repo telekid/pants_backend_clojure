@@ -5,24 +5,6 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
-from pants_backend_clojure import compile_clj
-from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
-from pants_backend_clojure.provided_dependencies import rules as provided_dependencies_rules
-from pants_backend_clojure.goals.package import (
-    ClojureDeployJarFieldSet,
-    package_clojure_deploy_jar,
-)
-from pants_backend_clojure.goals.package import rules as package_rules
-from pants_backend_clojure.subsystems.tools_build import rules as tools_build_rules
-from pants_backend_clojure.tools_build_uberjar import rules as tools_build_uberjar_rules
-from pants_backend_clojure.target_types import (
-    ClojureProvidedDependenciesField,
-    ClojureDeployJarTarget,
-    ClojureMainNamespaceField,
-    ClojureSourceTarget,
-)
-from pants_backend_clojure.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
@@ -36,8 +18,23 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as jdk_util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
-
-from tests.clojure_test_fixtures import CLOJURE_LOCKFILE, CLOJURE_3RDPARTY_BUILD, CLOJURE_VERSION, LOCKFILE_WITH_JSR305
+from pants_backend_clojure import compile_clj
+from pants_backend_clojure.goals.package import (
+    ClojureDeployJarFieldSet,
+)
+from pants_backend_clojure.goals.package import rules as package_rules
+from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
+from pants_backend_clojure.provided_dependencies import rules as provided_dependencies_rules
+from pants_backend_clojure.subsystems.tools_build import rules as tools_build_rules
+from pants_backend_clojure.target_types import (
+    ClojureDeployJarTarget,
+    ClojureMainNamespaceField,
+    ClojureProvidedDependenciesField,
+    ClojureSourceTarget,
+)
+from pants_backend_clojure.target_types import rules as target_types_rules
+from pants_backend_clojure.tools_build_uberjar import rules as tools_build_uberjar_rules
+from tests.clojure_test_fixtures import CLOJURE_3RDPARTY_BUILD, CLOJURE_LOCKFILE, CLOJURE_VERSION, LOCKFILE_WITH_JSR305
 
 _JVM_RESOLVES = {
     "java17": "locks/jvm/java17.lock.jsonc",
@@ -138,8 +135,8 @@ def test_package_deploy_jar_includes_source_files(rule_runner: RuleRunner) -> No
     Source files should be included in the uberjar so they're available at runtime
     for debugging, stack traces with source info, and dynamic code loading.
     """
-    import zipfile
     import io
+    import zipfile
 
     setup_rule_runner(rule_runner)
     rule_runner.write_files(
@@ -185,19 +182,16 @@ def test_package_deploy_jar_includes_source_files(rule_runner: RuleRunner) -> No
     digest_contents = rule_runner.request(DigestContents, [jar_digest])
     jar_content = next(fc for fc in digest_contents if fc.path.endswith(".jar"))
 
-    with zipfile.ZipFile(io.BytesIO(jar_content.content), 'r') as jar:
+    with zipfile.ZipFile(io.BytesIO(jar_content.content), "r") as jar:
         entries = jar.namelist()
 
         # Should have BOTH compiled classes AND source files
-        myapp_classes = [e for e in entries if e.startswith('myapp/') and e.endswith('.class')]
-        myapp_sources = [e for e in entries if e.startswith('myapp/') and e.endswith('.clj')]
+        myapp_classes = [e for e in entries if e.startswith("myapp/") and e.endswith(".class")]
+        myapp_sources = [e for e in entries if e.startswith("myapp/") and e.endswith(".clj")]
 
-        assert len(myapp_classes) > 0, \
-            f"Expected compiled classes for myapp namespace, found: {entries}"
-        assert 'myapp/core.clj' in entries, \
-            f"Expected myapp/core.clj source file in JAR, found: {entries}"
-        assert len(myapp_sources) > 0, \
-            f"Expected source files for myapp namespace, found: {entries}"
+        assert len(myapp_classes) > 0, f"Expected compiled classes for myapp namespace, found: {entries}"
+        assert "myapp/core.clj" in entries, f"Expected myapp/core.clj source file in JAR, found: {entries}"
+        assert len(myapp_sources) > 0, f"Expected source files for myapp namespace, found: {entries}"
 
 
 def test_package_deploy_jar_validates_gen_class(rule_runner: RuleRunner) -> None:
@@ -323,21 +317,18 @@ def test_package_deploy_jar_with_custom_gen_class_name(rule_runner: RuleRunner) 
     assert jar_content is not None, f"Could not find JAR file {jar_path} in digest"
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         entries = set(jar.namelist())
 
         # Verify namespace init class is present
-        assert 'custom/core__init.class' in entries, \
-            f"Namespace init class not found. Entries: {sorted(entries)}"
+        assert "custom/core__init.class" in entries, f"Namespace init class not found. Entries: {sorted(entries)}"
 
         # Verify custom gen-class :name class is present
-        assert 'custom/MyMainClass.class' in entries, \
-            f"Custom gen-class class not found. Entries: {sorted(entries)}"
+        assert "custom/MyMainClass.class" in entries, f"Custom gen-class class not found. Entries: {sorted(entries)}"
 
         # Verify manifest has correct Main-Class
-        manifest = jar.read('META-INF/MANIFEST.MF').decode()
-        assert 'Main-Class: custom.MyMainClass' in manifest, \
-            f"Wrong Main-Class in manifest: {manifest}"
+        manifest = jar.read("META-INF/MANIFEST.MF").decode()
+        assert "Main-Class: custom.MyMainClass" in manifest, f"Wrong Main-Class in manifest: {manifest}"
 
 
 def test_package_deploy_jar_multiple_gen_class_names(rule_runner: RuleRunner) -> None:
@@ -409,12 +400,10 @@ def test_package_deploy_jar_multiple_gen_class_names(rule_runner: RuleRunner) ->
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         entries = set(jar.namelist())
-        assert 'com/example/Main.class' in entries, \
-            f"Main gen-class not found. Entries: {sorted(entries)}"
-        assert 'com/example/Helper.class' in entries, \
-            f"Helper gen-class not found. Entries: {sorted(entries)}"
+        assert "com/example/Main.class" in entries, f"Main gen-class not found. Entries: {sorted(entries)}"
+        assert "com/example/Helper.class" in entries, f"Helper gen-class not found. Entries: {sorted(entries)}"
 
 
 def test_package_deploy_jar_gen_class_without_name(rule_runner: RuleRunner) -> None:
@@ -469,16 +458,15 @@ def test_package_deploy_jar_gen_class_without_name(rule_runner: RuleRunner) -> N
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         entries = set(jar.namelist())
 
         # Standard gen-class generates namespace-named class
-        assert 'app/core.class' in entries, \
-            f"Standard gen-class class not found. Entries: {sorted(entries)}"
-        assert 'app/core__init.class' in entries
+        assert "app/core.class" in entries, f"Standard gen-class class not found. Entries: {sorted(entries)}"
+        assert "app/core__init.class" in entries
 
-        manifest = jar.read('META-INF/MANIFEST.MF').decode()
-        assert 'Main-Class: app.core' in manifest
+        manifest = jar.read("META-INF/MANIFEST.MF").decode()
+        assert "Main-Class: app.core" in manifest
 
 
 def test_package_deploy_jar_gen_class_name_after_other_options(rule_runner: RuleRunner) -> None:
@@ -543,15 +531,14 @@ def test_package_deploy_jar_gen_class_name_after_other_options(rule_runner: Rule
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         entries = set(jar.namelist())
 
         # Custom gen-class with :name after other options should be detected
-        assert 'com/example/ComplexApp.class' in entries, \
-            f"Complex gen-class class not found. Entries: {sorted(entries)}"
+        assert "com/example/ComplexApp.class" in entries, f"Complex gen-class class not found. Entries: {sorted(entries)}"
 
-        manifest = jar.read('META-INF/MANIFEST.MF').decode()
-        assert 'Main-Class: com.example.ComplexApp' in manifest
+        manifest = jar.read("META-INF/MANIFEST.MF").decode()
+        assert "Main-Class: com.example.ComplexApp" in manifest
 
 
 def test_package_deploy_jar_with_defrecord_deftype(rule_runner: RuleRunner) -> None:
@@ -617,24 +604,26 @@ def test_package_deploy_jar_with_defrecord_deftype(rule_runner: RuleRunner) -> N
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         entries = set(jar.namelist())
 
         # Namespace init class
-        assert 'app/core__init.class' in entries, \
+        assert "app/core__init.class" in entries, (
             f"Namespace init class not found. Entries: {sorted(e for e in entries if e.startswith('app/'))}"
+        )
 
         # defrecord generates class in subdirectory
-        assert 'app/core/MyRecord.class' in entries, \
+        assert "app/core/MyRecord.class" in entries, (
             f"defrecord class not found. Entries: {sorted(e for e in entries if e.startswith('app/'))}"
+        )
 
         # deftype generates class in subdirectory
-        assert 'app/core/MyType.class' in entries, \
-            f"deftype class not found. Entries: {sorted(e for e in entries if e.startswith('app/'))}"
+        assert "app/core/MyType.class" in entries, f"deftype class not found. Entries: {sorted(e for e in entries if e.startswith('app/'))}"
 
         # defprotocol generates interface in subdirectory
-        assert 'app/core/MyProtocol.class' in entries, \
+        assert "app/core/MyProtocol.class" in entries, (
             f"defprotocol class not found. Entries: {sorted(e for e in entries if e.startswith('app/'))}"
+        )
 
 
 def test_package_deploy_jar_missing_main_namespace(rule_runner: RuleRunner) -> None:
@@ -667,10 +656,13 @@ def test_package_deploy_jar_missing_main_namespace(rule_runner: RuleRunner) -> N
     wrapped_exc = exc_info.value.wrapped_exceptions[0]
     assert isinstance(wrapped_exc, ValueError)
     # The error could be about missing source files or missing main namespace
-    assert any(msg in str(wrapped_exc) for msg in [
-        "Could not find source file",
-        "No Clojure source files found",
-    ])
+    assert any(
+        msg in str(wrapped_exc)
+        for msg in [
+            "Could not find source file",
+            "No Clojure source files found",
+        ]
+    )
 
 
 def test_package_deploy_jar_with_transitive_dependencies(rule_runner: RuleRunner) -> None:
@@ -892,22 +884,20 @@ def test_provided_dependencies_excluded_from_jar(rule_runner: RuleRunner) -> Non
 
     # Parse the JAR and check what classes are included
     import io
+
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
 
     # The main app classes should be present
-    assert any('app/core' in entry for entry in jar_entries), \
-        "Main app.core classes should be in JAR"
+    assert any("app/core" in entry for entry in jar_entries), "Main app.core classes should be in JAR"
 
     # The runtime dependency (lib.util) classes should be present
-    assert any('lib/util' in entry for entry in jar_entries), \
-        "Runtime dependency lib.util classes should be in JAR"
+    assert any("lib/util" in entry for entry in jar_entries), "Runtime dependency lib.util classes should be in JAR"
 
     # The provided dependency (api.interface) classes should NOT be present
-    api_entries = [entry for entry in jar_entries if 'api/interface' in entry]
-    assert len(api_entries) == 0, \
-        f"Provided dependency api.interface should NOT be in JAR, but found: {api_entries}"
+    api_entries = [entry for entry in jar_entries if "api/interface" in entry]
+    assert len(api_entries) == 0, f"Provided dependency api.interface should NOT be in JAR, but found: {api_entries}"
 
 
 def test_provided_jvm_artifact_excluded_from_jar(rule_runner: RuleRunner) -> None:
@@ -985,18 +975,16 @@ def test_provided_jvm_artifact_excluded_from_jar(rule_runner: RuleRunner) -> Non
 
     # Parse the JAR and check what classes are included
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
 
     # The main app classes should be present
-    assert any('app/core' in entry for entry in jar_entries), \
-        "Main app.core classes should be in JAR"
+    assert any("app/core" in entry for entry in jar_entries), "Main app.core classes should be in JAR"
 
     # The provided jvm_artifact (jsr305) classes should NOT be present
     # jsr305 contains javax/annotation classes
-    jsr305_entries = [entry for entry in jar_entries if 'javax/annotation' in entry]
-    assert len(jsr305_entries) == 0, \
-        f"Provided jvm_artifact jsr305 should NOT be in JAR, but found: {jsr305_entries}"
+    jsr305_entries = [entry for entry in jar_entries if "javax/annotation" in entry]
+    assert len(jsr305_entries) == 0, f"Provided jvm_artifact jsr305 should NOT be in JAR, but found: {jsr305_entries}"
 
 
 def test_transitive_maven_deps_included_in_jar(rule_runner: RuleRunner) -> None:
@@ -1064,28 +1052,24 @@ def test_transitive_maven_deps_included_in_jar(rule_runner: RuleRunner) -> None:
 
     # Parse the JAR and check what classes are included
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
 
     # The main app classes should be present
-    assert any('app/core' in entry for entry in jar_entries), \
-        "Main app.core classes should be in JAR"
+    assert any("app/core" in entry for entry in jar_entries), "Main app.core classes should be in JAR"
 
     # Direct dependency: org.clojure:clojure classes should be present
-    clojure_core_entries = [entry for entry in jar_entries if entry.startswith('clojure/core')]
-    assert len(clojure_core_entries) > 0, \
-        "Direct dependency org.clojure:clojure classes should be in JAR"
+    clojure_core_entries = [entry for entry in jar_entries if entry.startswith("clojure/core")]
+    assert len(clojure_core_entries) > 0, "Direct dependency org.clojure:clojure classes should be in JAR"
 
     # CRITICAL: Transitive dependencies should ALSO be present!
     # spec.alpha is a transitive dep of clojure - contains clojure/spec/alpha classes
-    spec_alpha_entries = [entry for entry in jar_entries if 'clojure/spec/alpha' in entry]
-    assert len(spec_alpha_entries) > 0, \
-        "Transitive dep spec.alpha classes should be in JAR (transitive of org.clojure:clojure)"
+    spec_alpha_entries = [entry for entry in jar_entries if "clojure/spec/alpha" in entry]
+    assert len(spec_alpha_entries) > 0, "Transitive dep spec.alpha classes should be in JAR (transitive of org.clojure:clojure)"
 
     # core.specs.alpha is also a transitive dep - contains clojure/core/specs/alpha classes
-    core_specs_entries = [entry for entry in jar_entries if 'clojure/core/specs/alpha' in entry]
-    assert len(core_specs_entries) > 0, \
-        "Transitive dep core.specs.alpha classes should be in JAR (transitive of org.clojure:clojure)"
+    core_specs_entries = [entry for entry in jar_entries if "clojure/core/specs/alpha" in entry]
+    assert len(core_specs_entries) > 0, "Transitive dep core.specs.alpha classes should be in JAR (transitive of org.clojure:clojure)"
 
 
 def test_provided_maven_transitives_excluded_from_jar(rule_runner: RuleRunner) -> None:
@@ -1164,28 +1148,24 @@ def test_provided_maven_transitives_excluded_from_jar(rule_runner: RuleRunner) -
 
     # Parse the JAR and check what classes are included
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
 
     # The main app classes should be present
-    assert any('app/core' in entry for entry in jar_entries), \
-        "Main app.core classes should be in JAR"
+    assert any("app/core" in entry for entry in jar_entries), "Main app.core classes should be in JAR"
 
     # The provided jvm_artifact (clojure) classes should NOT be present
-    clojure_entries = [entry for entry in jar_entries if entry.startswith('clojure/')]
-    assert len(clojure_entries) == 0, \
-        f"Provided jvm_artifact org.clojure:clojure should NOT be in JAR, but found: {clojure_entries[:10]}"
+    clojure_entries = [entry for entry in jar_entries if entry.startswith("clojure/")]
+    assert len(clojure_entries) == 0, f"Provided jvm_artifact org.clojure:clojure should NOT be in JAR, but found: {clojure_entries[:10]}"
 
     # MOST IMPORTANT: The TRANSITIVE dependencies should also NOT be present!
     # spec.alpha contains clojure/spec/alpha classes
-    spec_alpha_entries = [entry for entry in jar_entries if 'clojure/spec/alpha' in entry]
-    assert len(spec_alpha_entries) == 0, \
-        f"Transitive dep spec.alpha should NOT be in JAR, but found: {spec_alpha_entries[:10]}"
+    spec_alpha_entries = [entry for entry in jar_entries if "clojure/spec/alpha" in entry]
+    assert len(spec_alpha_entries) == 0, f"Transitive dep spec.alpha should NOT be in JAR, but found: {spec_alpha_entries[:10]}"
 
     # core.specs.alpha contains clojure/core/specs/alpha classes
-    core_specs_entries = [entry for entry in jar_entries if 'clojure/core/specs/alpha' in entry]
-    assert len(core_specs_entries) == 0, \
-        f"Transitive dep core.specs.alpha should NOT be in JAR, but found: {core_specs_entries[:10]}"
+    core_specs_entries = [entry for entry in jar_entries if "clojure/core/specs/alpha" in entry]
+    assert len(core_specs_entries) == 0, f"Transitive dep core.specs.alpha should NOT be in JAR, but found: {core_specs_entries[:10]}"
 
 
 def test_provided_deps_available_for_compilation_excluded_from_jar(rule_runner: RuleRunner) -> None:
@@ -1272,17 +1252,15 @@ def test_provided_deps_available_for_compilation_excluded_from_jar(rule_runner: 
 
     # Parse the JAR and check what classes are included
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
 
     # The main app classes should be present
-    assert any('app/core' in entry for entry in jar_entries), \
-        "Main app.core classes should be in JAR"
+    assert any("app/core" in entry for entry in jar_entries), "Main app.core classes should be in JAR"
 
     # The provided jsr305 classes should NOT be present
-    jsr305_entries = [entry for entry in jar_entries if entry.startswith('javax/annotation/')]
-    assert len(jsr305_entries) == 0, \
-        f"Provided jsr305 annotation classes should NOT be in JAR, but found: {jsr305_entries}"
+    jsr305_entries = [entry for entry in jar_entries if entry.startswith("javax/annotation/")]
+    assert len(jsr305_entries) == 0, f"Provided jsr305 annotation classes should NOT be in JAR, but found: {jsr305_entries}"
 
 
 def test_aot_classes_included_then_jar_overrides(rule_runner: RuleRunner) -> None:
@@ -1342,17 +1320,17 @@ def test_aot_classes_included_then_jar_overrides(rule_runner: RuleRunner) -> Non
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
 
     # Project classes should be present (from AOT, first pass)
-    myapp_classes = [e for e in jar_entries if e.startswith('myapp/')]
+    myapp_classes = [e for e in jar_entries if e.startswith("myapp/")]
     assert len(myapp_classes) > 0, "Project myapp classes should be in JAR"
 
     # Clojure core classes should be present
     # They come from the Clojure JAR (second pass, overrides AOT versions)
     # This ensures correct protocol identity for pre-compiled libraries
-    clojure_classes = [e for e in jar_entries if e.startswith('clojure/')]
+    clojure_classes = [e for e in jar_entries if e.startswith("clojure/")]
     assert len(clojure_classes) > 0, "Clojure classes should be in JAR (from dependency JARs)"
 
 
@@ -1435,25 +1413,24 @@ def test_transitive_first_party_classes_included(rule_runner: RuleRunner) -> Non
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
 
     # Main app classes should be present
-    myapp_classes = [e for e in jar_entries if e.startswith('myapp/')]
+    myapp_classes = [e for e in jar_entries if e.startswith("myapp/")]
     assert len(myapp_classes) > 0, "Main app myapp classes should be in JAR"
 
     # CRITICAL: The transitive library classes MUST be present
     # These come from AOT compilation only (no JAR to extract from)
     # This is the scenario that broke with source-only third-party libraries
-    mylib_classes = [e for e in jar_entries if e.startswith('mylib/')]
+    mylib_classes = [e for e in jar_entries if e.startswith("mylib/")]
     assert len(mylib_classes) > 0, (
         "Transitive first-party library mylib classes should be in JAR. "
         "This simulates source-only third-party libraries which have no pre-compiled JAR classes."
     )
 
     # Verify specific class patterns exist for the library
-    assert any('mylib/utils' in e and e.endswith('.class') for e in mylib_classes), \
-        "mylib.utils namespace classes should be present"
+    assert any("mylib/utils" in e and e.endswith(".class") for e in mylib_classes), "mylib.utils namespace classes should be present"
 
 
 def test_deeply_nested_transitive_deps_included(rule_runner: RuleRunner) -> None:
@@ -1568,14 +1545,14 @@ def test_deeply_nested_transitive_deps_included(rule_runner: RuleRunner) -> None
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
 
     # All namespaces in the chain must have their classes present
-    app_classes = [e for e in jar_entries if e.startswith('app/')]
-    lib_a_classes = [e for e in jar_entries if e.startswith('lib_a/')]
-    lib_b_classes = [e for e in jar_entries if e.startswith('lib_b/')]
-    lib_c_classes = [e for e in jar_entries if e.startswith('lib_c/')]
+    app_classes = [e for e in jar_entries if e.startswith("app/")]
+    lib_a_classes = [e for e in jar_entries if e.startswith("lib_a/")]
+    lib_b_classes = [e for e in jar_entries if e.startswith("lib_b/")]
+    lib_c_classes = [e for e in jar_entries if e.startswith("lib_c/")]
 
     assert len(app_classes) > 0, "app namespace classes should be in JAR"
     assert len(lib_a_classes) > 0, "lib-a namespace classes should be in JAR (direct dep)"
@@ -1652,7 +1629,7 @@ def test_no_duplicate_entries_in_jar(rule_runner: RuleRunner) -> None:
 
     # Parse the JAR and check for duplicate entries
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         entries = jar.namelist()
         unique_entries = set(entries)
 
@@ -1660,20 +1637,20 @@ def test_no_duplicate_entries_in_jar(rule_runner: RuleRunner) -> None:
         if len(entries) != len(unique_entries):
             # Find and report the duplicates
             from collections import Counter
+
             entry_counts = Counter(entries)
             duplicates = [entry for entry, count in entry_counts.items() if count > 1]
             pytest.fail(
-                f"JAR has {len(entries) - len(unique_entries)} duplicate entries: "
-                f"{duplicates[:10]}{'...' if len(duplicates) > 10 else ''}"
+                f"JAR has {len(entries) - len(unique_entries)} duplicate entries: {duplicates[:10]}{'...' if len(duplicates) > 10 else ''}"
             )
 
     # Verify both AOT and JAR classes are present (no missing coverage)
     # Project classes from AOT (not in any JAR)
-    myapp_classes = [e for e in unique_entries if e.startswith('myapp/')]
+    myapp_classes = [e for e in unique_entries if e.startswith("myapp/")]
     assert len(myapp_classes) > 0, "Project myapp classes should be in JAR"
 
     # Clojure classes from dependency JAR (not from AOT)
-    clojure_classes = [e for e in unique_entries if e.startswith('clojure/')]
+    clojure_classes = [e for e in unique_entries if e.startswith("clojure/")]
     assert len(clojure_classes) > 0, "Clojure classes should be in JAR"
 
 
@@ -1732,18 +1709,16 @@ def test_third_party_classes_not_from_aot(rule_runner: RuleRunner) -> None:
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
 
     # Third-party Clojure classes should be present (from JAR, not AOT)
-    clojure_core_classes = [e for e in jar_entries if e.startswith('clojure/core')]
-    assert len(clojure_core_classes) > 0, \
-        "Third-party clojure.core classes should be in JAR (from dependency JAR)"
+    clojure_core_classes = [e for e in jar_entries if e.startswith("clojure/core")]
+    assert len(clojure_core_classes) > 0, "Third-party clojure.core classes should be in JAR (from dependency JAR)"
 
     # clojure.string classes should be present
-    clojure_string_classes = [e for e in jar_entries if e.startswith('clojure/string')]
-    assert len(clojure_string_classes) > 0, \
-        "Third-party clojure.string classes should be in JAR (from dependency JAR)"
+    clojure_string_classes = [e for e in jar_entries if e.startswith("clojure/string")]
+    assert len(clojure_string_classes) > 0, "Third-party clojure.string classes should be in JAR (from dependency JAR)"
 
 
 def test_hyphenated_namespace_classes_included(rule_runner: RuleRunner) -> None:
@@ -1823,18 +1798,15 @@ def test_hyphenated_namespace_classes_included(rule_runner: RuleRunner) -> None:
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
 
     # my-lib.core should produce my_lib/core*.class files
-    my_lib_classes = [e for e in jar_entries if e.startswith('my_lib/')]
-    assert len(my_lib_classes) > 0, (
-        "Hyphenated namespace my-lib.core should have classes in JAR as my_lib/core*.class"
-    )
+    my_lib_classes = [e for e in jar_entries if e.startswith("my_lib/")]
+    assert len(my_lib_classes) > 0, "Hyphenated namespace my-lib.core should have classes in JAR as my_lib/core*.class"
 
     # Verify the core class specifically
-    assert any('my_lib/core' in e and e.endswith('.class') for e in my_lib_classes), \
-        "my_lib/core classes should be present"
+    assert any("my_lib/core" in e and e.endswith(".class") for e in my_lib_classes), "my_lib/core classes should be present"
 
 
 def test_hyphenated_main_namespace(rule_runner: RuleRunner) -> None:
@@ -1896,20 +1868,16 @@ def test_hyphenated_main_namespace(rule_runner: RuleRunner) -> None:
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
-        manifest = jar.read('META-INF/MANIFEST.MF').decode('utf-8')
+        manifest = jar.read("META-INF/MANIFEST.MF").decode("utf-8")
 
     # Main class should be munged to use underscores
-    assert 'Main-Class: my_app.core' in manifest, (
-        f"Main-Class should be 'my_app.core' (munged from my-app.core), got: {manifest}"
-    )
+    assert "Main-Class: my_app.core" in manifest, f"Main-Class should be 'my_app.core' (munged from my-app.core), got: {manifest}"
 
     # The class files should exist with underscored path
-    my_app_classes = [e for e in jar_entries if e.startswith('my_app/')]
-    assert len(my_app_classes) > 0, (
-        "Hyphenated main namespace my-app.core should have classes in JAR as my_app/core*.class"
-    )
+    my_app_classes = [e for e in jar_entries if e.startswith("my_app/")]
+    assert len(my_app_classes) > 0, "Hyphenated main namespace my-app.core should have classes in JAR as my_app/core*.class"
 
 
 # =============================================================================
@@ -1974,31 +1942,25 @@ def test_package_deploy_jar_clojure_main_source_only(rule_runner: RuleRunner) ->
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         entries = jar.namelist()
 
         # Should have first-party source files
-        source_files = [e for e in entries if e.endswith('.clj') and e.startswith('app/')]
-        assert len(source_files) > 0, \
-            f"Expected first-party source file not found in {entries}"
-        assert 'app/core.clj' in entries, \
-            f"Expected app/core.clj in JAR, found: {entries}"
+        source_files = [e for e in entries if e.endswith(".clj") and e.startswith("app/")]
+        assert len(source_files) > 0, f"Expected first-party source file not found in {entries}"
+        assert "app/core.clj" in entries, f"Expected app/core.clj in JAR, found: {entries}"
 
         # Should NOT have first-party compiled classes
-        first_party_classes = [e for e in entries if e.startswith('app/') and e.endswith('.class')]
-        assert not first_party_classes, \
-            f"Unexpected first-party classes in source-only JAR: {first_party_classes}"
+        first_party_classes = [e for e in entries if e.startswith("app/") and e.endswith(".class")]
+        assert not first_party_classes, f"Unexpected first-party classes in source-only JAR: {first_party_classes}"
 
         # Should have Clojure runtime (from dependency JARs)
-        assert any('clojure/core' in e for e in entries), \
-            "Clojure runtime not found in JAR"
+        assert any("clojure/core" in e for e in entries), "Clojure runtime not found in JAR"
 
         # Check manifest - should have Main-Class: clojure.main
-        manifest = jar.read('META-INF/MANIFEST.MF').decode()
-        assert 'X-Source-Only: true' in manifest, \
-            f"Expected X-Source-Only manifest attribute, got: {manifest}"
-        assert 'Main-Class: clojure.main' in manifest, \
-            f"Expected Main-Class: clojure.main manifest attribute, got: {manifest}"
+        manifest = jar.read("META-INF/MANIFEST.MF").decode()
+        assert "X-Source-Only: true" in manifest, f"Expected X-Source-Only manifest attribute, got: {manifest}"
+        assert "Main-Class: clojure.main" in manifest, f"Expected Main-Class: clojure.main manifest attribute, got: {manifest}"
 
 
 def test_package_deploy_jar_clojure_main_no_gen_class_required(rule_runner: RuleRunner) -> None:
@@ -2112,14 +2074,12 @@ def test_package_deploy_jar_clojure_main_includes_cljc(rule_runner: RuleRunner) 
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         entries = jar.namelist()
 
         # Should have both .clj and .cljc files
-        assert 'app/core.clj' in entries, \
-            f"Expected app/core.clj in JAR, found: {entries}"
-        assert 'app/util.cljc' in entries, \
-            f"Expected app/util.cljc in JAR, found: {entries}"
+        assert "app/core.clj" in entries, f"Expected app/core.clj in JAR, found: {entries}"
+        assert "app/util.cljc" in entries, f"Expected app/util.cljc in JAR, found: {entries}"
 
 
 def test_package_deploy_jar_clojure_main_with_transitive_deps(rule_runner: RuleRunner) -> None:
@@ -2196,24 +2156,20 @@ def test_package_deploy_jar_clojure_main_with_transitive_deps(rule_runner: RuleR
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         entries = jar.namelist()
 
         # Should have main app source
-        assert 'myapp/core.clj' in entries, \
-            f"Expected myapp/core.clj in JAR, found: {entries}"
+        assert "myapp/core.clj" in entries, f"Expected myapp/core.clj in JAR, found: {entries}"
 
         # Should have transitive library source
-        assert 'mylib/utils.clj' in entries, \
-            f"Expected transitive mylib/utils.clj in JAR, found: {entries}"
+        assert "mylib/utils.clj" in entries, f"Expected transitive mylib/utils.clj in JAR, found: {entries}"
 
         # Should NOT have first-party compiled classes
-        myapp_classes = [e for e in entries if e.startswith('myapp/') and e.endswith('.class')]
-        mylib_classes = [e for e in entries if e.startswith('mylib/') and e.endswith('.class')]
-        assert not myapp_classes, \
-            f"Unexpected myapp classes in source-only JAR: {myapp_classes}"
-        assert not mylib_classes, \
-            f"Unexpected mylib classes in source-only JAR: {mylib_classes}"
+        myapp_classes = [e for e in entries if e.startswith("myapp/") and e.endswith(".class")]
+        mylib_classes = [e for e in entries if e.startswith("mylib/") and e.endswith(".class")]
+        assert not myapp_classes, f"Unexpected myapp classes in source-only JAR: {myapp_classes}"
+        assert not mylib_classes, f"Unexpected mylib classes in source-only JAR: {mylib_classes}"
 
 
 def test_transitive_macro_generated_classes_included(rule_runner: RuleRunner) -> None:
@@ -2318,22 +2274,18 @@ def test_transitive_macro_generated_classes_included(rule_runner: RuleRunner) ->
     assert jar_content is not None
 
     jar_buffer = io.BytesIO(jar_content)
-    with zipfile.ZipFile(jar_buffer, 'r') as jar:
+    with zipfile.ZipFile(jar_buffer, "r") as jar:
         jar_entries = set(jar.namelist())
 
     # Verify the defrecord from deep library is included
-    assert 'deep_lib/records/Event.class' in jar_entries, (
+    assert "deep_lib/records/Event.class" in jar_entries, (
         "defrecord Event from transitive deep-lib should be in JAR. "
         f"Found entries: {sorted(e for e in jar_entries if e.startswith('deep_lib/'))}"
     )
 
     # Verify the defprotocol interface is included
-    assert 'deep_lib/records/EventHandler.class' in jar_entries, (
-        "defprotocol EventHandler from transitive deep-lib should be in JAR"
-    )
+    assert "deep_lib/records/EventHandler.class" in jar_entries, "defprotocol EventHandler from transitive deep-lib should be in JAR"
 
     # Verify namespace init classes
-    assert 'deep_lib/records__init.class' in jar_entries, \
-        "deep-lib.records init class should be in JAR"
-    assert 'mid_lib/handlers__init.class' in jar_entries, \
-        "mid-lib.handlers init class should be in JAR"
+    assert "deep_lib/records__init.class" in jar_entries, "deep-lib.records init class should be in JAR"
+    assert "mid_lib/handlers__init.class" in jar_entries, "mid-lib.handlers init class should be in JAR"

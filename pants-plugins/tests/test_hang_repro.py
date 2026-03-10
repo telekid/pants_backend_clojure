@@ -9,28 +9,25 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
-from pants_backend_clojure.goals.check import ClojureCheckFieldSet, ClojureCheckRequest
-from pants_backend_clojure.goals import check as check_goal
-from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
-from pants_backend_clojure.target_types import (
-    ClojureSourceTarget,
-)
-from pants_backend_clojure.target_types import rules as target_types_rules
-from pants_backend_clojure import compile_clj
 from pants.core.goals.check import CheckResults
 from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.jvm import classpath, jvm_common, non_jvm_dependencies
+from pants.jvm.classpath import Classpath
 from pants.jvm.goals import lockfile
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as jdk_util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
-from pants.jvm.classpath import Classpath
-from pants.engine.addresses import Addresses
-
+from pants_backend_clojure import compile_clj
+from pants_backend_clojure.goals import check as check_goal
+from pants_backend_clojure.goals.check import ClojureCheckFieldSet, ClojureCheckRequest
+from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
+from pants_backend_clojure.target_types import (
+    ClojureSourceTarget,
+)
+from pants_backend_clojure.target_types import rules as target_types_rules
 
 # Lockfile with Clojure 1.12.3 and correct fingerprints
 LOCKFILE_WITH_CLOJURE = """\
@@ -200,9 +197,7 @@ def test_check_does_not_hang_with_clojure_dependency(rule_runner: RuleRunner) ->
         "--jvm-default-resolve=jvm-default",
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name="example")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name="example"))
     field_set = ClojureCheckFieldSet.create(tgt)
 
     # This is where the hang occurs
@@ -283,10 +278,7 @@ def test_check_does_not_hang_with_classpath_resolution(rule_runner: RuleRunner) 
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    classpath = rule_runner.request(
-        Classpath,
-        [Addresses([Address(spec_path="", target_name="example")])]
-    )
+    classpath = rule_runner.request(Classpath, [Addresses([Address(spec_path="", target_name="example")])])
     assert classpath is not None
 
 

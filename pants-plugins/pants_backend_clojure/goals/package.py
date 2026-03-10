@@ -16,8 +16,8 @@ from pants.core.util_rules.source_files import SourceFilesRequest, determine_sou
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
-    CreateDigest,
     EMPTY_DIGEST,
+    CreateDigest,
     FileContent,
     MergeDigests,
 )
@@ -71,7 +71,7 @@ def extract_main_class(main_namespace: str, source_content: str) -> str:
     #   (:gen-class :name com.example.MyClass)
     #   (:gen-class :init init :name com.example.MyClass :methods [...])
     gen_class_name_match = re.search(
-        r'\(:gen-class[^)]*:name\s+([\w.-]+)',
+        r"\(:gen-class[^)]*:name\s+([\w.-]+)",
         source_content,
         re.DOTALL,
     )
@@ -119,15 +119,11 @@ async def package_clojure_deploy_jar(
     skip_aot = main_namespace == "clojure.main"
 
     # Get transitive targets to find all Clojure sources
-    trans_targets = await transitive_targets(
-        TransitiveTargetsRequest([field_set.address]), **implicitly()
-    )
+    trans_targets = await transitive_targets(TransitiveTargetsRequest([field_set.address]), **implicitly())
 
     # Find all Clojure source targets in dependencies
     clojure_source_targets = [
-        tgt
-        for tgt in trans_targets.dependencies
-        if tgt.has_field(ClojureSourceField) or tgt.has_field(ClojureTestSourceField)
+        tgt for tgt in trans_targets.dependencies if tgt.has_field(ClojureSourceField) or tgt.has_field(ClojureTestSourceField)
     ]
 
     # Get provided dependencies to exclude from the JAR
@@ -144,20 +140,14 @@ async def package_clojure_deploy_jar(
     # =========================================================================
     if skip_aot:
         # Build runtime address set for JAR packaging (excludes provided)
-        runtime_source_addresses = Addresses(
-            tgt.address for tgt in clojure_source_targets
-            if tgt.address not in provided_deps.addresses
-        )
+        runtime_source_addresses = Addresses(tgt.address for tgt in clojure_source_targets if tgt.address not in provided_deps.addresses)
 
         # Get classpath (excluding provided deps via address filtering)
-        runtime_classpath = await classpath_get(
-            **implicitly({runtime_source_addresses: Addresses})
-        )
+        runtime_classpath = await classpath_get(**implicitly({runtime_source_addresses: Addresses}))
 
         # Get first-party source files with stripped roots
         first_party_source_fields = [
-            tgt[ClojureSourceField] if tgt.has_field(ClojureSourceField)
-            else tgt[ClojureTestSourceField]
+            tgt[ClojureSourceField] if tgt.has_field(ClojureSourceField) else tgt[ClojureTestSourceField]
             for tgt in clojure_source_targets
             if tgt.address not in provided_deps.addresses
         ]
@@ -188,7 +178,7 @@ async def package_clojure_deploy_jar(
 
         # Create the JAR in memory
         jar_buffer = io.BytesIO()
-        with zipfile.ZipFile(jar_buffer, 'w', zipfile.ZIP_DEFLATED) as jar:
+        with zipfile.ZipFile(jar_buffer, "w", zipfile.ZIP_DEFLATED) as jar:
             # Write manifest (source-only mode)
             manifest_content = """\
 Manifest-Version: 1.0
@@ -196,8 +186,8 @@ Main-Class: clojure.main
 Created-By: Pants Build System
 X-Source-Only: true
 """
-            jar.writestr('META-INF/MANIFEST.MF', manifest_content, compress_type=zipfile.ZIP_STORED)
-            added_entries = {'META-INF/MANIFEST.MF'}
+            jar.writestr("META-INF/MANIFEST.MF", manifest_content, compress_type=zipfile.ZIP_STORED)
+            added_entries = {"META-INF/MANIFEST.MF"}
 
             # Add first-party source files
             for file_content in source_contents:
@@ -208,20 +198,20 @@ X-Source-Only: true
 
             # Extract and add contents from dependency JARs
             for file_content in classpath_contents:
-                if file_content.path.endswith('.jar'):
+                if file_content.path.endswith(".jar"):
                     # Check if this JAR is from a provided dependency
-                    jar_filename = file_content.path.rsplit('/', 1)[-1]
+                    jar_filename = file_content.path.rsplit("/", 1)[-1]
                     if any(jar_filename.startswith(prefix) for prefix in excluded_artifact_prefixes):
                         continue
 
                     try:
                         jar_bytes = io.BytesIO(file_content.content)
-                        with zipfile.ZipFile(jar_bytes, 'r') as dep_jar:
+                        with zipfile.ZipFile(jar_bytes, "r") as dep_jar:
                             for item in dep_jar.namelist():
                                 # Skip META-INF and LICENSE files
-                                if item.startswith('META-INF/'):
+                                if item.startswith("META-INF/"):
                                     continue
-                                if item.upper().startswith('LICENSE'):
+                                if item.upper().startswith("LICENSE"):
                                     continue
                                 if item not in added_entries:
                                     data = dep_jar.read(item)
@@ -264,9 +254,7 @@ X-Source-Only: true
     )
 
     # Analyze source files to validate main namespace has (:gen-class)
-    namespace_analysis = await analyze_clojure_namespaces(
-        ClojureNamespaceAnalysisRequest(source_files.snapshot), **implicitly()
-    )
+    namespace_analysis = await analyze_clojure_namespaces(ClojureNamespaceAnalysisRequest(source_files.snapshot), **implicitly())
     digest_contents = await get_digest_contents(source_files.snapshot.digest)
 
     # Validate main namespace has (:gen-class)
@@ -296,7 +284,7 @@ X-Source-Only: true
 
     # Check for (:gen-class) in the namespace declaration
     ns_with_gen_class = re.search(
-        r'\(ns\s+[\w.-]+.*?\(:gen-class',
+        r"\(ns\s+[\w.-]+.*?\(:gen-class",
         main_source_file,
         re.DOTALL,
     )
@@ -309,15 +297,12 @@ X-Source-Only: true
             f"(ns {main_namespace}\n"
             f"  (:gen-class))\n\n"
             f"(defn -main [& args]\n"
-            f"  (println \"Hello, World!\"))"
+            f'  (println "Hello, World!"))'
         )
 
     # Build address sets for classpaths
     all_source_addresses = Addresses(tgt.address for tgt in clojure_source_targets)
-    runtime_source_addresses = Addresses(
-        addr for addr in all_source_addresses
-        if addr not in provided_deps.addresses
-    )
+    runtime_source_addresses = Addresses(addr for addr in all_source_addresses if addr not in provided_deps.addresses)
 
     # Get both classpaths:
     # - compile_classpath: ALL deps including provided (for AOT compilation)
@@ -329,8 +314,7 @@ X-Source-Only: true
 
     # Get stripped source files for RUNTIME first-party code (excluding provided)
     runtime_source_fields = [
-        tgt[ClojureSourceField] if tgt.has_field(ClojureSourceField)
-        else tgt[ClojureTestSourceField]
+        tgt[ClojureSourceField] if tgt.has_field(ClojureSourceField) else tgt[ClojureTestSourceField]
         for tgt in clojure_source_targets
         if tgt.address not in provided_deps.addresses
     ]
@@ -338,8 +322,7 @@ X-Source-Only: true
     # Get stripped source files for PROVIDED first-party code
     # These are needed for compilation but should not be packaged
     provided_source_fields = [
-        tgt[ClojureSourceField] if tgt.has_field(ClojureSourceField)
-        else tgt[ClojureTestSourceField]
+        tgt[ClojureSourceField] if tgt.has_field(ClojureSourceField) else tgt[ClojureTestSourceField]
         for tgt in clojure_source_targets
         if tgt.address in provided_deps.addresses
     ]
@@ -385,10 +368,7 @@ X-Source-Only: true
 
     # Compute JAR prefixes for provided third-party dependencies
     # Format: "groupId_artifactId_" (matches Coursier JAR naming)
-    provided_jar_prefixes = tuple(
-        f"{group}_{artifact}_"
-        for group, artifact in provided_deps.coordinates
-    )
+    provided_jar_prefixes = tuple(f"{group}_{artifact}_" for group, artifact in provided_deps.coordinates)
 
     # Build uberjar with tools.build
     result = await build_uberjar_with_tools_build(

@@ -7,24 +7,11 @@ import zipfile
 from textwrap import dedent
 
 import pytest
-
-from pants_backend_clojure import compile_clj
-from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
-from pants_backend_clojure.provided_dependencies import rules as provided_dependencies_rules
-from pants_backend_clojure.subsystems.tools_build import rules as tools_build_rules
-from pants_backend_clojure.target_types import ClojureSourceField, ClojureSourceTarget
-from pants_backend_clojure.target_types import rules as target_types_rules
-from pants_backend_clojure.tools_build_uberjar import (
-    ToolsBuildUberjarRequest,
-    ToolsBuildUberjarResult,
-    generate_build_script,
-    rules as tools_build_uberjar_rules,
-)
 from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Addresses
-from pants.engine.fs import DigestContents, EMPTY_DIGEST
+from pants.engine.fs import EMPTY_DIGEST, DigestContents
 from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
 from pants.jvm import classpath, jvm_common, non_jvm_dependencies
@@ -35,7 +22,20 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as jdk_util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
-
+from pants_backend_clojure import compile_clj
+from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
+from pants_backend_clojure.provided_dependencies import rules as provided_dependencies_rules
+from pants_backend_clojure.subsystems.tools_build import rules as tools_build_rules
+from pants_backend_clojure.target_types import ClojureSourceField, ClojureSourceTarget
+from pants_backend_clojure.target_types import rules as target_types_rules
+from pants_backend_clojure.tools_build_uberjar import (
+    ToolsBuildUberjarRequest,
+    ToolsBuildUberjarResult,
+    generate_build_script,
+)
+from pants_backend_clojure.tools_build_uberjar import (
+    rules as tools_build_uberjar_rules,
+)
 from tests.clojure_test_fixtures import CLOJURE_3RDPARTY_BUILD, CLOJURE_LOCKFILE
 
 _JVM_RESOLVES = {
@@ -101,8 +101,8 @@ def test_generate_build_script() -> None:
     # Check that key elements are present
     assert "(ns build" in script
     assert "clojure.tools.build.api" in script
-    assert 'main-ns \'my.app.core' in script
-    assert 'main-class \'my.app.core' in script
+    assert "main-ns 'my.app.core" in script
+    assert "main-class 'my.app.core" in script
     assert 'class-dir "classes"' in script
     assert 'uber-file "app.jar"' in script
     assert 'java-cmd "/path/to/java"' in script
@@ -121,8 +121,8 @@ def test_generate_build_script_custom_values() -> None:
         uber_file="server.jar",
     )
 
-    assert 'main-ns \'com.example.server' in script
-    assert 'main-class \'com.example.CustomMain' in script
+    assert "main-ns 'com.example.server" in script
+    assert "main-class 'com.example.CustomMain" in script
     assert 'class-dir "target/classes"' in script
     assert 'uber-file "server.jar"' in script
     assert 'java-cmd "/custom/java"' in script
@@ -267,10 +267,12 @@ def test_build_uberjar_with_transitive_deps(rule_runner: RuleRunner) -> None:
     )
 
     # Get all targets
-    all_addresses = Addresses([
-        Address("src/app", target_name="core"),
-        Address("src/utils", target_name="helper"),
-    ])
+    all_addresses = Addresses(
+        [
+            Address("src/app", target_name="core"),
+            Address("src/utils", target_name="helper"),
+        ]
+    )
     targets = rule_runner.request(Targets, [all_addresses])
 
     # Get stripped source files
@@ -371,6 +373,4 @@ def test_build_uberjar_with_hyphenated_namespace(rule_runner: RuleRunner) -> Non
         jar_entries = jar.namelist()
 
         # Clojure converts hyphens to underscores
-        assert any("my_app/core" in e for e in jar_entries), (
-            f"Expected my_app/core classes (hyphen -> underscore), got: {jar_entries}"
-        )
+        assert any("my_app/core" in e for e in jar_entries), f"Expected my_app/core classes (hyphen -> underscore), got: {jar_entries}"

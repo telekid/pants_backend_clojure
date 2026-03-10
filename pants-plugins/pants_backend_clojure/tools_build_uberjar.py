@@ -17,15 +17,11 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.intrinsics import add_prefix, create_digest, execute_process, merge_digests
-from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess, jvm_process, prepare_jdk_environment
-from pants.jvm.resolve.coursier_fetch import ToolClasspath
 from pants.jvm.target_types import JvmJdkField
 from pants.util.logging import LogLevel
 
@@ -290,13 +286,15 @@ async def build_uberjar_with_tools_build(
 
     # Merge everything
     input_digest = await merge_digests(
-        MergeDigests([
-            build_script_digest,
-            src_digest,
-            provided_src_digest,
-            compile_libs_digest,
-            uber_libs_digest,
-        ]),
+        MergeDigests(
+            [
+                build_script_digest,
+                src_digest,
+                provided_src_digest,
+                compile_libs_digest,
+                uber_libs_digest,
+            ]
+        ),
     )
 
     # 4. Run tools.build

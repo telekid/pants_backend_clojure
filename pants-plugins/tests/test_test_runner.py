@@ -3,17 +3,6 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
-from pants_backend_clojure.target_types import (
-    ClojureSourcesGeneratorTarget,
-    ClojureSourceTarget,
-    ClojureTestsGeneratorTarget,
-    ClojureTestTarget,
-)
-from pants_backend_clojure.target_types import rules as target_types_rules
-from pants_backend_clojure.goals.test import ClojureTestFieldSet, ClojureTestRequest
-from pants_backend_clojure.goals.test import rules as test_runner_rules
-from pants_backend_clojure import compile_clj
 from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.core.goals.test import TestResult
 from pants.core.util_rules import config_files, source_files, stripped_source_files, system_binaries
@@ -25,7 +14,17 @@ from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as jdk_util_rules
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants_backend_clojure import compile_clj
+from pants_backend_clojure.goals.test import ClojureTestFieldSet, ClojureTestRequest
+from pants_backend_clojure.goals.test import rules as test_runner_rules
+from pants_backend_clojure.target_types import (
+    ClojureSourcesGeneratorTarget,
+    ClojureSourceTarget,
+    ClojureTestsGeneratorTarget,
+    ClojureTestTarget,
+)
+from pants_backend_clojure.target_types import rules as target_types_rules
 
 
 @pytest.fixture
@@ -80,9 +79,7 @@ def run_clojure_test(
         *(extra_args or []),
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
-    tgt = rule_runner.get_target(
-        Address(spec_path=spec_path, target_name=target_name, relative_file_path=relative_file_path)
-    )
+    tgt = rule_runner.get_target(Address(spec_path=spec_path, target_name=target_name, relative_file_path=relative_file_path))
     return rule_runner.request(
         TestResult,
         [ClojureTestRequest.Batch("", (ClojureTestFieldSet.create(tgt),), None)],
@@ -1253,7 +1250,4 @@ def test_syntax_error_in_test_fails_with_message(rule_runner: RuleRunner) -> Non
     assert result.exit_code != 0
     output = (result.stdout_bytes + result.stderr_bytes).decode()
     # Verify error message mentions syntax/EOF/parsing issue
-    assert any(
-        keyword in output.lower()
-        for keyword in ["eof", "syntax", "unexpected", "parse", "read"]
-    )
+    assert any(keyword in output.lower() for keyword in ["eof", "syntax", "unexpected", "parse", "read"])

@@ -1,12 +1,10 @@
 """Tests for Clojure namespace utility functions."""
 
-import pytest
-
 from pants_backend_clojure.utils.namespace_parser import (
-    namespace_to_path,
-    path_to_namespace,
     class_to_path,
     is_jdk_class,
+    namespace_to_path,
+    path_to_namespace,
 )
 
 
@@ -41,8 +39,7 @@ def test_class_to_path_simple():
 
 def test_class_to_path_nested_packages():
     """Test converting classes in deeply nested packages."""
-    assert class_to_path("com.fasterxml.jackson.databind.ObjectMapper") == \
-        "com/fasterxml/jackson/databind/ObjectMapper.java"
+    assert class_to_path("com.fasterxml.jackson.databind.ObjectMapper") == "com/fasterxml/jackson/databind/ObjectMapper.java"
 
 
 def test_class_to_path_inner_class():

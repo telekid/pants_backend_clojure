@@ -9,14 +9,13 @@ from pants.core.goals.test import (
 )
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
-    BoolField,
     COMMON_TARGET_FIELDS,
+    BoolField,
     FieldSet,
     MultipleSourcesField,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
-    StringSequenceField,
     Target,
     TargetFilesGenerator,
     generate_multiple_sources_field_help_message,
@@ -117,9 +116,7 @@ class ClojureSourcesGeneratorSourcesField(ClojureGeneratorSourcesField):
         "!test_*.clj",
         "!test_*.cljc",
     )
-    help = generate_multiple_sources_field_help_message(
-        "Example: `sources=['Example.clj', 'New*.clj', '!OldExample.clj']`"
-    )
+    help = generate_multiple_sources_field_help_message("Example: `sources=['Example.clj', 'New*.clj', '!OldExample.clj']`")
 
 
 class ClojureSourcesGeneratorTarget(TargetFilesGenerator):
@@ -176,9 +173,7 @@ class ClojureTestTarget(Target):
 
 class ClojureTestsGeneratorSourcesField(ClojureGeneratorSourcesField):
     default = ("*_test.clj", "*_test.cljc", "test_*.clj", "test_*.cljc")
-    help = generate_multiple_sources_field_help_message(
-        "Example: `sources=['*_test.clj', '!skip_test.clj']`"
-    )
+    help = generate_multiple_sources_field_help_message("Example: `sources=['*_test.clj', '!skip_test.clj']`")
 
 
 @dataclass(frozen=True)
@@ -238,7 +233,7 @@ class ClojureMainNamespaceField(StringField):
         "  (ns my.app.core\n"
         "    (:gen-class))\n"
         "  (defn -main [& args]\n"
-        "    (println \"Hello, World!\"))\n\n"
+        '    (println "Hello, World!"))\n\n'
         "To avoid AOT compilation entirely (source-only JAR), use 'clojure.main' "
         "as the main namespace and invoke your app namespace at runtime:\n"
         "  java -jar app.jar -m my.actual.namespace"

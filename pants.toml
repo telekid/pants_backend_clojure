@@ -7,6 +7,8 @@ backend_packages = [
   "pants.backend.python",
   "pants_backend_clojure",
   "pants.backend.plugin_development",
+  "pants.backend.experimental.python.lint.ruff.check",
+  "pants.backend.experimental.python.lint.ruff.format",
 ]
 
 [python-infer]

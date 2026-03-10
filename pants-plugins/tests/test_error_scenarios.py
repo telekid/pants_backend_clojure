@@ -5,19 +5,6 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
-from pants_backend_clojure.goals.check import ClojureCheckFieldSet, ClojureCheckRequest
-from pants_backend_clojure.goals import check as check_goal
-from pants_backend_clojure.goals.test import ClojureTestFieldSet, ClojureTestRequest
-from pants_backend_clojure.goals.test import rules as test_runner_rules
-from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
-from pants_backend_clojure.target_types import (
-    ClojureSourcesGeneratorTarget,
-    ClojureSourceTarget,
-    ClojureTestTarget,
-)
-from pants_backend_clojure.target_types import rules as target_types_rules
-from pants_backend_clojure import compile_clj
 from pants.core.goals.check import CheckResults
 from pants.core.goals.test import TestResult
 from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
@@ -29,10 +16,19 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as jdk_util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
-from pants.engine.fs import DigestContents
-from pants.engine.internals.graph import CycleException
-
-from tests.clojure_test_fixtures import CLOJURE_LOCKFILE, CLOJURE_3RDPARTY_BUILD
+from pants_backend_clojure import compile_clj
+from pants_backend_clojure.goals import check as check_goal
+from pants_backend_clojure.goals.check import ClojureCheckFieldSet, ClojureCheckRequest
+from pants_backend_clojure.goals.test import ClojureTestFieldSet, ClojureTestRequest
+from pants_backend_clojure.goals.test import rules as test_runner_rules
+from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
+from pants_backend_clojure.target_types import (
+    ClojureSourcesGeneratorTarget,
+    ClojureSourceTarget,
+    ClojureTestTarget,
+)
+from pants_backend_clojure.target_types import rules as target_types_rules
+from tests.clojure_test_fixtures import CLOJURE_3RDPARTY_BUILD, CLOJURE_LOCKFILE
 
 
 @pytest.fixture
@@ -103,9 +99,7 @@ def test_check_with_missing_source_file_reference(rule_runner: RuleRunner) -> No
     # Attempting to get a target with a missing source file should fail
     # or the check should handle it gracefully
     with pytest.raises(Exception):
-        tgt = rule_runner.get_target(
-            Address(spec_path="", target_name="example", relative_file_path="example.clj")
-        )
+        tgt = rule_runner.get_target(Address(spec_path="", target_name="example", relative_file_path="example.clj"))
         field_set = ClojureCheckFieldSet.create(tgt)
         rule_runner.request(CheckResults, [ClojureCheckRequest([field_set])])
 
@@ -126,9 +120,7 @@ def test_check_with_malformed_clojure_syntax(rule_runner: RuleRunner) -> None:
         "--jvm-default-resolve=jvm-default",
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name="", relative_file_path="malformed.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name="", relative_file_path="malformed.clj"))
     field_set = ClojureCheckFieldSet.create(tgt)
     results = rule_runner.request(CheckResults, [ClojureCheckRequest([field_set])])
 
@@ -244,9 +236,7 @@ def test_empty_namespace_declaration(rule_runner: RuleRunner) -> None:
         "--jvm-default-resolve=jvm-default",
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name="", relative_file_path="no_ns.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name="", relative_file_path="no_ns.clj"))
     field_set = ClojureCheckFieldSet.create(tgt)
     results = rule_runner.request(CheckResults, [ClojureCheckRequest([field_set])])
 
@@ -319,9 +309,7 @@ def test_check_with_unicode_characters(rule_runner: RuleRunner) -> None:
         "--jvm-default-resolve=jvm-default",
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name="", relative_file_path="unicode.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name="", relative_file_path="unicode.clj"))
     field_set = ClojureCheckFieldSet.create(tgt)
     results = rule_runner.request(CheckResults, [ClojureCheckRequest([field_set])])
 

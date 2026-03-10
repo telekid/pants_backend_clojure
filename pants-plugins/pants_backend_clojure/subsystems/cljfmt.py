@@ -73,16 +73,10 @@ class Cljfmt(ExternalTool):
 
         platform_str = platform_mapping.get(plat.value)
         if not platform_str:
-            raise ValueError(
-                f"Unsupported platform for cljfmt: {plat.value}. "
-                f"Supported platforms: {', '.join(platform_mapping.keys())}"
-            )
+            raise ValueError(f"Unsupported platform for cljfmt: {plat.value}. Supported platforms: {', '.join(platform_mapping.keys())}")
 
         version = self.version
-        return (
-            f"https://github.com/weavejester/cljfmt/releases/download/"
-            f"{version}/cljfmt-{version}-{platform_str}.tar.gz"
-        )
+        return f"https://github.com/weavejester/cljfmt/releases/download/{version}/cljfmt-{version}-{platform_str}.tar.gz"
 
     def generate_exe(self, _plat: Platform) -> str:
         """Generate the executable name.

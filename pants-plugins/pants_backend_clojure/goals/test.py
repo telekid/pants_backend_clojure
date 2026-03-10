@@ -4,18 +4,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from pants_backend_clojure.target_types import (
-    ClojureSourceField,
-    ClojureTestExtraEnvVarsField,
-    ClojureTestFieldSet,
-    ClojureTestSourceField,
-    ClojureTestTimeoutField,
-)
-from pants.option.option_types import SkipOption
-from pants.option.subsystem import Subsystem
 from pants.core.goals.test import (
     TestDebugRequest,
-    TestFieldSet,
     TestRequest,
     TestResult,
     TestSubsystem,
@@ -34,12 +24,18 @@ from pants.engine.process import (
 )
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import SourcesField, TransitiveTargetsRequest
-from pants.engine.unions import UnionRule
 from pants.jvm.classpath import classpath as classpath_get
 from pants.jvm.jdk_rules import JdkRequest, JvmProcess, jvm_process, prepare_jdk_environment
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmDependenciesField, JvmJdkField
+from pants.option.option_types import SkipOption
+from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
+
+from pants_backend_clojure.target_types import (
+    ClojureSourceField,
+    ClojureTestFieldSet,
+    ClojureTestSourceField,
+)
 
 
 class ClojureTestSubsystem(Subsystem):
@@ -109,7 +105,7 @@ async def setup_clojure_test_for_target(
             f"Expected format: (ns my-namespace-name)\n\n"
             f"Troubleshooting:\n"
             f"  1. Ensure the file starts with a valid (ns ...) form\n"
-            f"  2. Check for syntax errors: pants check {field_set.address}\n"
+            f"  2. Check for syntax errors: pants check {request.field_set.address}\n"
             f"  3. Verify namespace follows Clojure naming conventions\n"
         )
     test_namespace = match.group(1)
@@ -137,11 +133,7 @@ async def setup_clojure_test_for_target(
     reports_dir = f"__reports/{request.field_set.address.path_safe_spec}"
 
     # Cache test runs only if successful, or not at all if --test-force
-    cache_scope = (
-        ProcessCacheScope.PER_SESSION
-        if test_subsystem.force
-        else ProcessCacheScope.SUCCESSFUL
-    )
+    cache_scope = ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
 
     # Extra JVM args for debug mode
     extra_jvm_args: list[str] = []
@@ -190,18 +182,14 @@ async def run_clojure_test(
     field_set = batch.single_element
 
     # Setup test process
-    test_setup = await setup_clojure_test_for_target(
-        TestSetupRequest(field_set, is_debug=False), **implicitly()
-    )
+    test_setup = await setup_clojure_test_for_target(TestSetupRequest(field_set, is_debug=False), **implicitly())
 
     # Convert JvmProcess to Process
     jvm_proc = test_setup.process
     process = await jvm_process(**implicitly({jvm_proc: JvmProcess}))
 
     # Execute with retry support
-    process_results = await execute_process_with_retry(
-        ProcessWithRetries(process, test_subsystem.attempts_default), **implicitly()
-    )
+    process_results = await execute_process_with_retry(ProcessWithRetries(process, test_subsystem.attempts_default), **implicitly())
 
     return TestResult.from_fallible_process_result(
         process_results=process_results.results,
@@ -214,9 +202,7 @@ async def run_clojure_test(
 async def setup_clojure_test_debug_request(
     batch: ClojureTestRequest.Batch[ClojureTestFieldSet, Any],
 ) -> TestDebugRequest:
-    setup = await setup_clojure_test_for_target(
-        TestSetupRequest(batch.single_element, is_debug=True), **implicitly()
-    )
+    setup = await setup_clojure_test_for_target(TestSetupRequest(batch.single_element, is_debug=True), **implicitly())
     jvm_proc = setup.process
     process = await jvm_process(**implicitly({jvm_proc: JvmProcess}))
 

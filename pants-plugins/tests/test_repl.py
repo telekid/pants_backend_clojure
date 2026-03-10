@@ -3,7 +3,19 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget
+from pants.core.goals.repl import ReplRequest
+from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
+from pants.engine.addresses import Address
+from pants.engine.rules import QueryRule
+from pants.jvm import classpath, jvm_common, non_jvm_dependencies
+from pants.jvm.goals import lockfile
+from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
+from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.target_types import JvmArtifactTarget
+from pants.jvm.util_rules import rules as jdk_util_rules
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants_backend_clojure import compile_clj
 from pants_backend_clojure.goals.repl import ClojureNRepl, ClojureRebelRepl, ClojureRepl
 from pants_backend_clojure.goals.repl import rules as repl_rules
 from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
@@ -14,20 +26,6 @@ from pants_backend_clojure.target_types import (
     ClojureTestTarget,
 )
 from pants_backend_clojure.target_types import rules as target_types_rules
-from pants_backend_clojure import compile_clj
-from pants.backend.java.target_types import JavaSourcesGeneratorTarget
-from pants.core.goals.repl import ReplRequest
-from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
-from pants.engine.addresses import Address
-from pants.engine.rules import QueryRule
-from pants.engine.target import AllTargets
-from pants.jvm import classpath, jvm_common, non_jvm_dependencies
-from pants.jvm.goals import lockfile
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmArtifactTarget
-from pants.jvm.util_rules import rules as jdk_util_rules
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 
 
 @pytest.fixture
@@ -213,9 +211,7 @@ def test_repl_request_includes_clojure_main(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name="lib", relative_file_path="example.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name="lib", relative_file_path="example.clj"))
 
     repl = ClojureRepl(targets=(tgt,))
     request = rule_runner.request(ReplRequest, [repl])
@@ -270,15 +266,13 @@ def test_repl_request_includes_source_files(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name="lib", relative_file_path="example.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name="lib", relative_file_path="example.clj"))
 
     repl = ClojureRepl(targets=(tgt,))
     request = rule_runner.request(ReplRequest, [repl])
 
     # Verify digest is not empty (contains source files and dependencies)
-    assert request.digest != None
+    assert request.digest is not None
     assert request.digest.fingerprint != ""
 
     # Verify JDK environment is set up
@@ -327,9 +321,7 @@ def test_repl_request_includes_dependencies(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name="lib", relative_file_path="example.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name="lib", relative_file_path="example.clj"))
 
     repl = ClojureRepl(targets=(tgt,))
     request = rule_runner.request(ReplRequest, [repl])
@@ -407,9 +399,7 @@ def test_repl_request_with_test_sources(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     # Get test target
-    test_tgt = rule_runner.get_target(
-        Address(spec_path="test", target_name="tests", relative_file_path="example_test.clj")
-    )
+    test_tgt = rule_runner.get_target(Address(spec_path="test", target_name="tests", relative_file_path="example_test.clj"))
 
     repl = ClojureRepl(targets=(test_tgt,))
     request = rule_runner.request(ReplRequest, [repl])
@@ -479,12 +469,8 @@ def test_repl_request_with_multiple_targets(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     # Get both targets
-    foo_tgt = rule_runner.get_target(
-        Address(spec_path="foo", target_name="lib", relative_file_path="foo.clj")
-    )
-    bar_tgt = rule_runner.get_target(
-        Address(spec_path="bar", target_name="lib", relative_file_path="bar.clj")
-    )
+    foo_tgt = rule_runner.get_target(Address(spec_path="foo", target_name="lib", relative_file_path="foo.clj"))
+    bar_tgt = rule_runner.get_target(Address(spec_path="bar", target_name="lib", relative_file_path="bar.clj"))
 
     repl = ClojureRepl(targets=(foo_tgt, bar_tgt))
     request = rule_runner.request(ReplRequest, [repl])
@@ -493,7 +479,7 @@ def test_repl_request_with_multiple_targets(rule_runner: RuleRunner) -> None:
     assert "clojure.main" in request.args
     assert "--repl" in request.args
     assert request.run_in_workspace is True
-    assert request.digest != None
+    assert request.digest is not None
 
 
 def test_repl_uses_workspace_for_live_reloading(rule_runner: RuleRunner) -> None:
@@ -542,16 +528,13 @@ def test_repl_uses_workspace_for_live_reloading(rule_runner: RuleRunner) -> None
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name="lib", relative_file_path="example.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name="lib", relative_file_path="example.clj"))
 
     repl = ClojureRepl(targets=(tgt,))
     request = rule_runner.request(ReplRequest, [repl])
 
     # Critical: run_in_workspace must be True for live reloading
-    assert request.run_in_workspace is True, \
-        "REPL must run in workspace to see live file changes during development"
+    assert request.run_in_workspace is True, "REPL must run in workspace to see live file changes during development"
 
 
 def test_repl_argv_includes_jdk_paths(rule_runner: RuleRunner) -> None:
@@ -598,9 +581,7 @@ def test_repl_argv_includes_jdk_paths(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name="lib", relative_file_path="example.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name="lib", relative_file_path="example.clj"))
 
     repl = ClojureRepl(targets=(tgt,))
     request = rule_runner.request(ReplRequest, [repl])
@@ -609,8 +590,7 @@ def test_repl_argv_includes_jdk_paths(rule_runner: RuleRunner) -> None:
     argv_str = " ".join(request.args)
 
     # Should contain {chroot} prefix for JDK paths when run_in_workspace=True
-    assert "{chroot}" in argv_str, \
-        "JDK paths must use {chroot} prefix for run_in_workspace=True"
+    assert "{chroot}" in argv_str, "JDK paths must use {chroot} prefix for run_in_workspace=True"
 
     # Should still reference bash and clojure.main
     assert any("bash" in arg for arg in request.args)
@@ -655,9 +635,7 @@ def test_repl_environment_includes_chroot_prefix(rule_runner: RuleRunner) -> Non
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name="lib", relative_file_path="example.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name="lib", relative_file_path="example.clj"))
 
     repl = ClojureRepl(targets=(tgt,))
     request = rule_runner.request(ReplRequest, [repl])
@@ -711,9 +689,7 @@ def test_repl_classpath_includes_source_roots(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    tgt = rule_runner.get_target(
-        Address(spec_path="", target_name="lib", relative_file_path="example.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="", target_name="lib", relative_file_path="example.clj"))
 
     repl = ClojureRepl(targets=(tgt,))
     request = rule_runner.request(ReplRequest, [repl])
@@ -726,8 +702,7 @@ def test_repl_classpath_includes_source_roots(rule_runner: RuleRunner) -> None:
             classpath_entries = classpath.split(":")
 
             # For a file at the root with namespace 'example', the source root should be "."
-            assert "." in classpath_entries, \
-                f"Classpath must include source root '.'. Got: {classpath_entries}"
+            assert "." in classpath_entries, f"Classpath must include source root '.'. Got: {classpath_entries}"
             break
     else:
         pytest.fail("-cp argument not found in argv")
@@ -822,9 +797,7 @@ def test_repl_load_resolve_sources_enabled_by_default(rule_runner: RuleRunner) -
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     # Run REPL for project A only
-    tgt = rule_runner.get_target(
-        Address(spec_path="project_a", target_name="lib", relative_file_path="a.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="project_a", target_name="lib", relative_file_path="a.clj"))
 
     repl = ClojureRepl(targets=(tgt,))
     request = rule_runner.request(ReplRequest, [repl])
@@ -842,10 +815,10 @@ def test_repl_load_resolve_sources_enabled_by_default(rule_runner: RuleRunner) -
             classpath_entries = classpath.split(":")
 
             # Both project directories should be source roots in the classpath
-            assert "project_a" in classpath_entries, \
-                f"project_a source root must be in classpath. Got: {classpath_entries}"
-            assert "project_b" in classpath_entries, \
+            assert "project_a" in classpath_entries, f"project_a source root must be in classpath. Got: {classpath_entries}"
+            assert "project_b" in classpath_entries, (
                 f"project_b source root must be in classpath (load_resolve_sources=True). Got: {classpath_entries}"
+            )
             break
     else:
         pytest.fail("-cp argument not found in argv")
@@ -918,9 +891,7 @@ def test_repl_load_resolve_sources_disabled_hermetic_mode(rule_runner: RuleRunne
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     # Run REPL for project A only
-    tgt = rule_runner.get_target(
-        Address(spec_path="project_a", target_name="lib", relative_file_path="a.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="project_a", target_name="lib", relative_file_path="a.clj"))
 
     repl = ClojureRepl(targets=(tgt,))
     request = rule_runner.request(ReplRequest, [repl])
@@ -938,12 +909,10 @@ def test_repl_load_resolve_sources_disabled_hermetic_mode(rule_runner: RuleRunne
             classpath_entries = classpath.split(":")
 
             # project_a should be in classpath (it's the target we're running)
-            assert "project_a" in classpath_entries, \
-                f"project_a source root must be in classpath. Got: {classpath_entries}"
+            assert "project_a" in classpath_entries, f"project_a source root must be in classpath. Got: {classpath_entries}"
 
             # project_b should NOT be in classpath (hermetic mode, not a dependency)
-            assert "project_b" not in classpath_entries, \
-                f"project_b should NOT be in classpath in hermetic mode. Got: {classpath_entries}"
+            assert "project_b" not in classpath_entries, f"project_b should NOT be in classpath in hermetic mode. Got: {classpath_entries}"
             break
     else:
         pytest.fail("-cp argument not found in argv")
@@ -1019,16 +988,14 @@ def test_repl_load_resolve_sources_with_multiple_resolves(rule_runner: RuleRunne
     )
 
     args = [
-        f"--jvm-resolves={{'resolve-a': '3rdparty/jvm/resolve-a.lock', 'resolve-b': '3rdparty/jvm/resolve-b.lock'}}",
+        "--jvm-resolves={'resolve-a': '3rdparty/jvm/resolve-a.lock', 'resolve-b': '3rdparty/jvm/resolve-b.lock'}",
         "--jvm-default-resolve=resolve-a",
         # load_resolve_sources is enabled by default
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
     # Run REPL for project A (resolve-a)
-    tgt = rule_runner.get_target(
-        Address(spec_path="project_a", target_name="lib", relative_file_path="a.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="project_a", target_name="lib", relative_file_path="a.clj"))
 
     repl = ClojureRepl(targets=(tgt,))
     request = rule_runner.request(ReplRequest, [repl])
@@ -1081,9 +1048,7 @@ def test_repl_nrepl_load_resolve_sources(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    tgt = rule_runner.get_target(
-        Address(spec_path="project_a", target_name="lib", relative_file_path="a.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="project_a", target_name="lib", relative_file_path="a.clj"))
 
     # This test verifies the rule executes without errors
     # Actual nREPL functionality would require Maven artifacts
@@ -1133,9 +1098,7 @@ def test_repl_rebel_load_resolve_sources(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
 
-    tgt = rule_runner.get_target(
-        Address(spec_path="project_a", target_name="lib", relative_file_path="a.clj")
-    )
+    tgt = rule_runner.get_target(Address(spec_path="project_a", target_name="lib", relative_file_path="a.clj"))
 
     # This test verifies the rule executes without errors
     # Actual Rebel functionality would require Maven artifacts

@@ -3,22 +3,6 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
-from pants_backend_clojure.target_types import (
-    ClojureDeployJarTarget,
-    ClojureMainNamespaceField,
-    ClojureSourceField,
-    ClojureSourcesGeneratorSourcesField,
-    ClojureSourcesGeneratorTarget,
-    ClojureSourceTarget,
-    ClojureTestExtraEnvVarsField,
-    ClojureTestSourceField,
-    ClojureTestsGeneratorSourcesField,
-    ClojureTestsGeneratorTarget,
-    ClojureTestTarget,
-    ClojureTestTimeoutField,
-)
-from pants_backend_clojure.target_types import rules as target_types_rules
 from pants.build_graph.address import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.rules import QueryRule
@@ -30,6 +14,20 @@ from pants.jvm.target_types import (
     JvmResolveField,
 )
 from pants.testutil.rule_runner import RuleRunner
+from pants_backend_clojure.target_types import (
+    ClojureDeployJarTarget,
+    ClojureMainNamespaceField,
+    ClojureSourceField,
+    ClojureSourcesGeneratorSourcesField,
+    ClojureSourcesGeneratorTarget,
+    ClojureSourceTarget,
+    ClojureTestsGeneratorSourcesField,
+    ClojureTestsGeneratorTarget,
+    ClojureTestSourceField,
+    ClojureTestTarget,
+    ClojureTestTimeoutField,
+)
+from pants_backend_clojure.target_types import rules as target_types_rules
 
 
 @pytest.fixture
@@ -82,9 +80,7 @@ def assert_generated(
             ),
         ],
     )
-    assert expected_targets == {
-        t for parametrization in parametrizations for t in parametrization.parametrization.values()
-    }
+    assert expected_targets == {t for parametrization in parametrizations for t in parametrization.parametrization.values()}
 
 
 def test_clojure_source_field_extensions() -> None:
@@ -138,9 +134,7 @@ def test_generate_clojure_source_targets(rule_runner: RuleRunner) -> None:
     )
 
     # The generator should create individual targets for each .clj and .cljc file
-    generated_targets = {
-        t for parametrization in parametrizations for t in parametrization.parametrization.values()
-    }
+    generated_targets = {t for parametrization in parametrizations for t in parametrization.parametrization.values()}
 
     # Check that we got three targets (one for each file)
     assert len(generated_targets) == 3
@@ -193,7 +187,9 @@ def test_clojure_source_with_jdk(rule_runner: RuleRunner) -> None:
 
 def test_clojure_source_with_dependencies(rule_runner: RuleRunner) -> None:
     """Test that clojure_source respects the dependencies field."""
-    rule_runner.write_files({"src/clj/BUILD": 'clojure_sources(name="lib", dependencies=["//3rdparty/jvm:clojure"])\n', "src/clj/example.clj": ""})
+    rule_runner.write_files(
+        {"src/clj/BUILD": 'clojure_sources(name="lib", dependencies=["//3rdparty/jvm:clojure"])\n', "src/clj/example.clj": ""}
+    )
     assert_generated(
         rule_runner,
         Address("src/clj", target_name="lib"),
@@ -236,9 +232,7 @@ def test_clojure_sources_excludes_test_files(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    generated_targets = {
-        t for parametrization in parametrizations for t in parametrization.parametrization.values()
-    }
+    generated_targets = {t for parametrization in parametrizations for t in parametrization.parametrization.values()}
 
     # Should only have one target (example.clj), not the test file
     assert len(generated_targets) == 1
@@ -300,9 +294,7 @@ def test_generate_clojure_test_targets(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    generated_targets = {
-        t for parametrization in parametrizations for t in parametrization.parametrization.values()
-    }
+    generated_targets = {t for parametrization in parametrizations for t in parametrization.parametrization.values()}
 
     assert len(generated_targets) == 2
     assert all(isinstance(t, ClojureTestTarget) for t in generated_targets)
@@ -313,9 +305,7 @@ def test_generate_clojure_test_targets(rule_runner: RuleRunner) -> None:
 
 def test_clojure_test_with_timeout(rule_runner: RuleRunner) -> None:
     """Test that clojure_test respects the timeout field."""
-    rule_runner.write_files(
-        {"test/clj/BUILD": 'clojure_tests(name="tests", timeout=120)\n', "test/clj/example_test.clj": ""}
-    )
+    rule_runner.write_files({"test/clj/BUILD": 'clojure_tests(name="tests", timeout=120)\n', "test/clj/example_test.clj": ""})
     assert_generated(
         rule_runner,
         Address("test/clj", target_name="tests"),
@@ -334,9 +324,7 @@ def test_clojure_test_with_timeout(rule_runner: RuleRunner) -> None:
 
 def test_clojure_test_with_resolve(rule_runner: RuleRunner) -> None:
     """Test that clojure_test respects the resolve field."""
-    rule_runner.write_files(
-        {"test/clj/BUILD": 'clojure_tests(name="tests", resolve="java17")\n', "test/clj/example_test.clj": ""}
-    )
+    rule_runner.write_files({"test/clj/BUILD": 'clojure_tests(name="tests", resolve="java17")\n', "test/clj/example_test.clj": ""})
     assert_generated(
         rule_runner,
         Address("test/clj", target_name="tests"),

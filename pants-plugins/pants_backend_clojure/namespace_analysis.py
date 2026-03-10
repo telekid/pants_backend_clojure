@@ -12,23 +12,20 @@ import json
 import logging
 from dataclasses import dataclass
 
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest, find_config_file
+from pants.core.util_rules.config_files import ConfigFilesRequest, find_config_file
 from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
     download_external_tool,
 )
-from pants.engine.fs import Digest, MergeDigests, Snapshot
+from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 from pants_backend_clojure.subsystems.clj_kondo import CljKondo
-
 
 logger = logging.getLogger(__name__)
 
@@ -95,11 +92,13 @@ async def analyze_clojure_namespaces(
 
     # Merge source files, clj-kondo binary, and config files
     input_digest = await merge_digests(
-        MergeDigests([
-            request.snapshot.digest,
-            downloaded.digest,
-            config_files.snapshot.digest,
-        ]),
+        MergeDigests(
+            [
+                request.snapshot.digest,
+                downloaded.digest,
+                config_files.snapshot.digest,
+            ]
+        ),
     )
 
     # Run clj-kondo analysis in batch mode on all files

@@ -11,27 +11,8 @@ import os
 from textwrap import dedent
 
 import pytest
-
-from pants_backend_clojure.dependency_inference import (
-    InferClojureSourceDependencies,
-    InferClojureTestDependencies,
-)
-from pants_backend_clojure.dependency_inference import rules as dependency_inference_rules
-from pants_backend_clojure.clojure_symbol_mapping import rules as clojure_symbol_mapping_rules
-from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
-from pants_backend_clojure.goals.test import ClojureTestFieldSet, ClojureTestRequest
-from pants_backend_clojure.goals.test import rules as test_runner_rules
-from pants_backend_clojure.target_types import (
-    ClojureSourcesGeneratorTarget,
-    ClojureSourceTarget,
-    ClojureTestsGeneratorTarget,
-    ClojureTestTarget,
-)
-from pants_backend_clojure.target_types import rules as target_types_rules
-from pants_backend_clojure import compile_clj
 from pants.core.goals.test import TestResult
 from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
-from pants.jvm import classpath, jvm_common, non_jvm_dependencies
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import QueryRule
 from pants.engine.target import (
@@ -39,7 +20,7 @@ from pants.engine.target import (
     ExplicitlyProvidedDependencies,
     InferredDependencies,
 )
-from pants.jvm import jdk_rules
+from pants.jvm import classpath, jdk_rules, jvm_common, non_jvm_dependencies
 from pants.jvm.dependency_inference import artifact_mapper
 from pants.jvm.dependency_inference import symbol_mapper as jvm_symbol_mapper
 from pants.jvm.goals import lockfile
@@ -49,6 +30,23 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as jvm_util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants_backend_clojure import compile_clj
+from pants_backend_clojure.clojure_symbol_mapping import rules as clojure_symbol_mapping_rules
+from pants_backend_clojure.dependency_inference import (
+    InferClojureSourceDependencies,
+    InferClojureTestDependencies,
+)
+from pants_backend_clojure.dependency_inference import rules as dependency_inference_rules
+from pants_backend_clojure.goals.test import ClojureTestRequest
+from pants_backend_clojure.goals.test import rules as test_runner_rules
+from pants_backend_clojure.namespace_analysis import rules as namespace_analysis_rules
+from pants_backend_clojure.target_types import (
+    ClojureSourcesGeneratorTarget,
+    ClojureSourceTarget,
+    ClojureTestsGeneratorTarget,
+    ClojureTestTarget,
+)
+from pants_backend_clojure.target_types import rules as target_types_rules
 
 
 def maybe_skip_jdk_test(func):
@@ -154,30 +152,19 @@ def test_infer_clojure_source_dependency(rule_runner: RuleRunner) -> None:
     )
 
     # Get the test target
-    test_target = rule_runner.get_target(
-        Address("", target_name="test", relative_file_path="my/utils_test.clj")
-    )
-    utils_target = rule_runner.get_target(
-        Address("", target_name="utils", relative_file_path="my/utils.clj")
-    )
+    test_target = rule_runner.get_target(Address("", target_name="test", relative_file_path="my/utils_test.clj"))
+    utils_target = rule_runner.get_target(Address("", target_name="utils", relative_file_path="my/utils.clj"))
 
     # Request inference for the test
     from pants_backend_clojure.dependency_inference import ClojureTestDependenciesInferenceFieldSet
 
     inferred = rule_runner.request(
         InferredDependencies,
-        [
-            InferClojureTestDependencies(
-                ClojureTestDependenciesInferenceFieldSet.create(test_target)
-            )
-        ],
+        [InferClojureTestDependencies(ClojureTestDependenciesInferenceFieldSet.create(test_target))],
     )
 
     # Should infer dependency on utils
-    assert inferred == InferredDependencies([utils_target.address]), (
-        f"Expected {utils_target.address} to be inferred, "
-        f"but got {inferred}"
-    )
+    assert inferred == InferredDependencies([utils_target.address]), f"Expected {utils_target.address} to be inferred, but got {inferred}"
 
 
 @maybe_skip_jdk_test
@@ -232,29 +219,18 @@ def test_infer_clojure_test_dependency(rule_runner: RuleRunner) -> None:
     )
 
     # Get the test target
-    test_target = rule_runner.get_target(
-        Address("", target_name="test", relative_file_path="calculator_test.clj")
-    )
-    calculator_target = rule_runner.get_target(
-        Address("", target_name="calculator", relative_file_path="calculator.clj")
-    )
+    test_target = rule_runner.get_target(Address("", target_name="test", relative_file_path="calculator_test.clj"))
+    calculator_target = rule_runner.get_target(Address("", target_name="calculator", relative_file_path="calculator.clj"))
 
     # Request inference for the test
     from pants_backend_clojure.dependency_inference import ClojureTestDependenciesInferenceFieldSet
 
     inferred = rule_runner.request(
         InferredDependencies,
-        [
-            InferClojureTestDependencies(
-                ClojureTestDependenciesInferenceFieldSet.create(test_target)
-            )
-        ],
+        [InferClojureTestDependencies(ClojureTestDependenciesInferenceFieldSet.create(test_target))],
     )
 
     # Should infer dependency on calculator
     assert inferred == InferredDependencies([calculator_target.address]), (
-        f"Expected {calculator_target.address} to be inferred, "
-        f"but got {inferred}"
+        f"Expected {calculator_target.address} to be inferred, but got {inferred}"
     )
-
-

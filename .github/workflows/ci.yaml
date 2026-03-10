@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request: {}
+  push:
+    branches:
+      - main
+
+jobs:
+  lint_test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Java (Temurin 17 and 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+
+      - name: Initialize Pants
+        uses: pantsbuild/actions/init-pants@v10
+        with:
+          gha-cache-key: cache0-py3.11
+          named-caches-hash: ${{ hashFiles('locks/**') }}
+
+      - name: Lint and typecheck
+        run: pants lint check ::
+
+      - name: Run tests
+        run: pants test pants-plugins::
+
+      - name: Upload pants.log
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: pants-logs
+          overwrite: "true"
+          path: .pants.d/workdir/*.log

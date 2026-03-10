@@ -6,27 +6,24 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.core.goals.lint import LintResult, LintTargetsRequest
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest, find_config_file
+from pants.core.util_rules.config_files import ConfigFilesRequest, find_config_file
 from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
     download_external_tool,
 )
 from pants.core.util_rules.partitions import (
     Partition,
-    Partitions,
     PartitionerType,
+    Partitions,
 )
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest, determine_source_files
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import MergeDigests
 from pants.engine.intrinsics import execute_process, merge_digests
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.jvm.classpath import classpath as classpath_get
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmResolveField
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -148,8 +145,8 @@ async def clj_kondo_lint(
     # Step 7: Build command line
     argv = [
         downloaded_clj_kondo.exe,
-        *cache_args,          # --cache-dir .clj-kondo/.cache (if enabled)
-        "--lint",             # lint source files only (first-party)
+        *cache_args,  # --cache-dir .clj-kondo/.cache (if enabled)
+        "--lint",  # lint source files only (first-party)
         *clj_kondo.args,
         *source_files.snapshot.files,
     ]
@@ -172,8 +169,7 @@ async def clj_kondo_lint(
         stdout=result.stdout.decode(),
         stderr=result.stderr.decode(),
         linter_name="clj-kondo",
-        partition_description=request.partition_metadata.description
-            if request.partition_metadata else None,
+        partition_description=request.partition_metadata.description if request.partition_metadata else None,
     )
 
 

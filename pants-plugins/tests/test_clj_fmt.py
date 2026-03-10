@@ -3,7 +3,13 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
+from pants.core.goals.fmt import FmtResult
+from pants.core.util_rules import config_files, external_tool, source_files
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Address
+from pants.engine.fs import Digest, DigestContents
+from pants.engine.rules import QueryRule
+from pants.testutil.rule_runner import RuleRunner
 from pants_backend_clojure.goals.fmt import CljfmtRequest
 from pants_backend_clojure.goals.fmt import rules as fmt_rules
 from pants_backend_clojure.target_types import (
@@ -11,13 +17,6 @@ from pants_backend_clojure.target_types import (
     ClojureSourceTarget,
 )
 from pants_backend_clojure.target_types import rules as target_types_rules
-from pants.core.goals.fmt import FmtResult
-from pants.core.util_rules import config_files, external_tool, source_files
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents
-from pants.engine.rules import QueryRule
-from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.fixture
@@ -54,10 +53,7 @@ def run_cljfmt(
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
-    field_sets = [
-        CljfmtRequest.field_set_type.create(rule_runner.get_target(address))
-        for address in targets
-    ]
+    field_sets = [CljfmtRequest.field_set_type.create(rule_runner.get_target(address)) for address in targets]
     input_sources = rule_runner.request(
         SourceFiles,
         [SourceFilesRequest(field_set.sources for field_set in field_sets)],

@@ -19,15 +19,14 @@ import logging
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, DigestContents, FileContent, PathGlobs
+from pants.engine.fs import Digest, FileContent, PathGlobs
 from pants.engine.intrinsics import get_digest_contents, path_globs_to_digest
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.jvm.dependency_inference.artifact_mapper import (
-    AllJvmArtifactTargets,
     DEFAULT_SYMBOL_NAMESPACE,
+    AllJvmArtifactTargets,
     FrozenTrieNode,
     MutableTrieNode,
 )
@@ -37,8 +36,6 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
-    JvmArtifactArtifactField,
-    JvmArtifactGroupField,
     JvmArtifactPackagesField,
     JvmResolveField,
 )
@@ -46,7 +43,6 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 from pants_backend_clojure.utils.jar_analyzer import analyze_jar_for_namespaces
-
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +61,7 @@ class ClojureNamespaceMapping:
         mapping_per_resolve: Maps resolve name -> FrozenTrieNode containing
                             namespace -> addresses mappings.
     """
+
     mapping_per_resolve: FrozenDict[str, FrozenTrieNode]
 
     def addresses_for_namespace(
@@ -124,6 +121,7 @@ class ClojureNamespaceMapping:
 @dataclass(frozen=True)
 class ThirdPartyClojureNamespaceMappingRequest:
     """Request to build namespace mapping for a resolve by analyzing JARs."""
+
     resolve_name: str
 
 
@@ -134,6 +132,7 @@ class ThirdPartyClojureNamespaceMapping:
     This is the result of analyzing all JARs in a lockfile to discover which
     Clojure namespaces they provide.
     """
+
     # namespace -> addresses (multiple if ambiguous)
     mapping: FrozenDict[str, tuple[Address, ...]]
 
@@ -154,6 +153,7 @@ class AvailableClojureArtifactPackages:
     The `packages` field supports glob patterns like `my.namespace.**` which
     matches the namespace and all sub-namespaces.
     """
+
     # Maps (resolve, namespace_pattern) -> addresses
     # Multiple addresses if the same pattern is declared on multiple artifacts
     mapping: FrozenDict[tuple[str, str], tuple[Address, ...]]
@@ -197,9 +197,7 @@ async def find_clojure_artifact_packages(
             if tgt.address not in mapping[key]:
                 mapping[key].append(tgt.address)
 
-    return AvailableClojureArtifactPackages(
-        FrozenDict({key: tuple(addrs) for key, addrs in mapping.items()})
-    )
+    return AvailableClojureArtifactPackages(FrozenDict({key: tuple(addrs) for key, addrs in mapping.items()}))
 
 
 @rule(desc="Analyzing JARs for Clojure namespaces", level=LogLevel.DEBUG)
@@ -243,10 +241,7 @@ async def build_third_party_clojure_namespace_mapping(
         return ThirdPartyClojureNamespaceMapping(FrozenDict())
 
     # Fetch all JARs using Coursier (uses cache)
-    classpath_entries = await concurrently(
-        coursier_fetch_one_coord(entry, **implicitly())
-        for entry in lockfile.entries
-    )
+    classpath_entries = await concurrently(coursier_fetch_one_coord(entry, **implicitly()) for entry in lockfile.entries)
 
     # Analyze each JAR for Clojure namespaces
     mapping: dict[str, list[Address]] = {}
@@ -266,7 +261,7 @@ async def build_third_party_clojure_namespace_mapping(
 
             # Write to temp file and analyze
             # TODO: Consider making analyze_jar_for_namespaces accept bytes directly
-            with tempfile.NamedTemporaryFile(suffix='.jar', delete=False) as tmp_jar:
+            with tempfile.NamedTemporaryFile(suffix=".jar", delete=False) as tmp_jar:
                 tmp_jar.write(jar_contents[0].content)
                 tmp_jar.flush()
                 jar_path = Path(tmp_jar.name)
@@ -288,9 +283,7 @@ async def build_third_party_clojure_namespace_mapping(
             logger.debug(f"Error analyzing JAR for {coord_str}: {e}")
             continue
 
-    return ThirdPartyClojureNamespaceMapping(
-        FrozenDict({ns: tuple(addrs) for ns, addrs in mapping.items()})
-    )
+    return ThirdPartyClojureNamespaceMapping(FrozenDict({ns: tuple(addrs) for ns, addrs in mapping.items()}))
 
 
 # ============================================================================
@@ -350,7 +343,7 @@ def _parse_namespace_pattern(pattern: str) -> tuple[str, bool]:
     """
     wildcard_suffix = ".**"
     if pattern.endswith(wildcard_suffix):
-        return pattern[:-len(wildcard_suffix)], True
+        return pattern[: -len(wildcard_suffix)], True
     else:
         return pattern, False
 
@@ -438,10 +431,7 @@ async def load_clojure_namespace_mapping(
         )
 
     # Freeze all tries
-    frozen_tries = FrozenDict({
-        resolve: trie.frozen()
-        for resolve, trie in tries.items()
-    })
+    frozen_tries = FrozenDict({resolve: trie.frozen() for resolve, trie in tries.items()})
 
     return ClojureNamespaceMapping(mapping_per_resolve=frozen_tries)
 
@@ -485,9 +475,7 @@ async def _load_legacy_metadata_files() -> dict[tuple[str, str], tuple[Address, 
                         mapping[key].append(address)
 
         except Exception as e:
-            logger.warning(
-                f"Failed to parse Clojure namespace metadata file {file_content.path}: {e}"
-            )
+            logger.warning(f"Failed to parse Clojure namespace metadata file {file_content.path}: {e}")
 
     return {key: tuple(addrs) for key, addrs in mapping.items()}
 
@@ -504,6 +492,7 @@ class ClojureNamespaceMetadataFile:
     Attributes:
         path: Path to the metadata JSON file (e.g., "3rdparty/jvm/default_clojure_namespaces.json").
     """
+
     path: str
 
 
@@ -516,6 +505,7 @@ class ClojureNamespaceMetadata:
         lockfile_hash: SHA256 hash of the lockfile when metadata was generated.
         artifacts: Map of Maven coordinate to artifact metadata.
     """
+
     resolve: str
     lockfile_hash: str
     artifacts: dict[str, ArtifactNamespaceMetadata]
@@ -530,6 +520,7 @@ class ArtifactNamespaceMetadata:
         namespaces: Clojure namespaces provided by this artifact.
         source: How the namespaces were determined ("jar-analysis", "manual", "heuristic").
     """
+
     address: str
     namespaces: tuple[str, ...]
     source: str = "jar-analysis"
@@ -547,31 +538,31 @@ def _parse_metadata_file(file_content: FileContent) -> ClojureNamespaceMetadata:
     Raises:
         ValueError: If the file is malformed or has invalid structure.
     """
-    data = json.loads(file_content.content.decode('utf-8'))
+    data = json.loads(file_content.content.decode("utf-8"))
 
     # Validate required fields
-    if 'resolve' not in data:
+    if "resolve" not in data:
         raise ValueError("Metadata file missing 'resolve' field")
-    if 'artifacts' not in data:
+    if "artifacts" not in data:
         raise ValueError("Metadata file missing 'artifacts' field")
 
     # Parse artifact metadata
     artifacts = {}
-    for coord, artifact_data in data['artifacts'].items():
-        if 'address' not in artifact_data:
+    for coord, artifact_data in data["artifacts"].items():
+        if "address" not in artifact_data:
             raise ValueError(f"Artifact {coord} missing 'address' field")
-        if 'namespaces' not in artifact_data:
+        if "namespaces" not in artifact_data:
             raise ValueError(f"Artifact {coord} missing 'namespaces' field")
 
         artifacts[coord] = ArtifactNamespaceMetadata(
-            address=artifact_data['address'],
-            namespaces=tuple(artifact_data['namespaces']),
-            source=artifact_data.get('source', 'jar-analysis'),
+            address=artifact_data["address"],
+            namespaces=tuple(artifact_data["namespaces"]),
+            source=artifact_data.get("source", "jar-analysis"),
         )
 
     return ClojureNamespaceMetadata(
-        resolve=data['resolve'],
-        lockfile_hash=data.get('lockfile_hash', ''),
+        resolve=data["resolve"],
+        lockfile_hash=data.get("lockfile_hash", ""),
         artifacts=artifacts,
     )
 
@@ -623,7 +614,7 @@ def create_metadata_file_content(
 
     return FileContent(
         path=output_path,
-        content=content.encode('utf-8'),
+        content=content.encode("utf-8"),
     )
 
 

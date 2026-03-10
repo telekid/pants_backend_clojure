@@ -3,7 +3,18 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
-
+from pants.backend.java.target_types import JavaSourcesGeneratorTarget
+from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
+from pants.engine.rules import QueryRule
+from pants.engine.target import AllTargets
+from pants.jvm import classpath, jvm_common, non_jvm_dependencies
+from pants.jvm.goals import lockfile
+from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
+from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.jvm.target_types import JvmArtifactTarget
+from pants.jvm.util_rules import rules as jdk_util_rules
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants_backend_clojure import compile_clj
 from pants_backend_clojure.goals.generate_deps import (
     GenerateDepsEdn,
     LockFileEntry,
@@ -22,19 +33,6 @@ from pants_backend_clojure.target_types import (
     ClojureTestTarget,
 )
 from pants_backend_clojure.target_types import rules as target_types_rules
-from pants.backend.java.target_types import JavaSourcesGeneratorTarget
-from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
-from pants.engine.rules import QueryRule
-from pants.engine.target import AllTargets
-from pants.jvm import classpath, jvm_common, non_jvm_dependencies
-from pants.jvm.goals import lockfile
-from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
-from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.jvm.target_types import JvmArtifactTarget
-from pants.jvm.util_rules import rules as jdk_util_rules
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
-
-from pants_backend_clojure import compile_clj
 
 
 @pytest.fixture
@@ -263,7 +261,7 @@ def test_format_deps_edn_deps_sorting() -> None:
     lines = result.split("\n")
 
     # Extract dependency keys to verify order
-    dep_keys = [line.strip().split()[0] for line in lines if line.strip() and not line.strip() in ["{", "}"]]
+    dep_keys = [line.strip().split()[0] for line in lines if line.strip() and line.strip() not in ["{", "}"]]
     assert dep_keys == ["aaa/first", "mmm/middle", "zzz/last"]
 
 
@@ -294,10 +292,10 @@ def test_format_deps_edn_deps_handles_duplicate_artifacts() -> None:
     # The sort is by (group, artifact) only, so within duplicates, original order is preserved
     # (Python's sort is stable). We should have 1.12.3 for clojure (first in input)
     # and 33.0.0-jre for guava (first in input)
-    assert '1.12.3' in result, "Expected version 1.12.3 (first occurrence in input list)"
-    assert '33.0.0-jre' in result, "Expected version 33.0.0-jre (first occurrence in input list)"
-    assert '1.11.0' not in result, "Should not contain duplicate version 1.11.0"
-    assert '32.0.0-jre' not in result, "Should not contain duplicate version 32.0.0-jre"
+    assert "1.12.3" in result, "Expected version 1.12.3 (first occurrence in input list)"
+    assert "33.0.0-jre" in result, "Expected version 33.0.0-jre (first occurrence in input list)"
+    assert "1.11.0" not in result, "Should not contain duplicate version 1.11.0"
+    assert "32.0.0-jre" not in result, "Should not contain duplicate version 32.0.0-jre"
 
 
 def test_format_deps_edn_deps_duplicate_same_version() -> None:
@@ -315,7 +313,7 @@ def test_format_deps_edn_deps_duplicate_same_version() -> None:
     assert clojure_count == 1, f"Expected 1 org.clojure/clojure entry, found {clojure_count}"
 
     # Verify the correct version is present
-    assert '1.12.3' in result
+    assert "1.12.3" in result
 
 
 def test_format_deps_edn_complete() -> None:
@@ -521,9 +519,7 @@ def test_lock_file_entry_defaults() -> None:
 
 def test_lock_file_entry_custom_packaging() -> None:
     """Test LockFileEntry with custom packaging."""
-    entry = LockFileEntry(
-        group="com.example", artifact="test", version="1.0.0", packaging="pom"
-    )
+    entry = LockFileEntry(group="com.example", artifact="test", version="1.0.0", packaging="pom")
 
     assert entry.packaging == "pom"
 
@@ -738,9 +734,7 @@ def test_parse_lock_file_invalid_toml() -> None:
 def test_format_deps_edn_deps_special_characters() -> None:
     """Test formatting dependencies with special characters in version."""
     entries = [
-        LockFileEntry(
-            group="com.example", artifact="lib", version="1.0.0-alpha+build.123"
-        ),
+        LockFileEntry(group="com.example", artifact="lib", version="1.0.0-alpha+build.123"),
     ]
 
     result = format_deps_edn_deps(entries)
@@ -826,18 +820,15 @@ def test_generate_deps_edn_nested_source_dirs(rule_runner: RuleRunner) -> None:
 
     # Read and verify the generated deps.edn content
     from pathlib import Path
+
     deps_edn_path = Path(rule_runner.build_root) / "deps.edn"
     deps_edn_content = deps_edn_path.read_text()
 
     # Verify source paths contain the correct nested path
-    assert "sub-project/src" in deps_edn_content, (
-        f"Expected 'sub-project/src' in :paths, got: {deps_edn_content}"
-    )
+    assert "sub-project/src" in deps_edn_content, f"Expected 'sub-project/src' in :paths, got: {deps_edn_content}"
 
     # Verify test paths contain the correct nested path
-    assert "sub-project/test" in deps_edn_content, (
-        f"Expected 'sub-project/test' in :test :extra-paths, got: {deps_edn_content}"
-    )
+    assert "sub-project/test" in deps_edn_content, f"Expected 'sub-project/test' in :test :extra-paths, got: {deps_edn_content}"
 
     # Verify we DON'T have the incorrect parent directory
     # Check that "sub-project" alone (not followed by /src or /test) is not in paths
@@ -874,7 +865,7 @@ def test_generate_deps_edn_many_targets(rule_runner: RuleRunner) -> None:
     # Generate source targets
     for i in range(num_sources):
         files[f"src/ns{i}/BUILD"] = dedent(
-            f"""\
+            """\
             clojure_sources(
                 name='lib',
                 dependencies=[
@@ -894,7 +885,7 @@ def test_generate_deps_edn_many_targets(rule_runner: RuleRunner) -> None:
     # Generate test targets
     for i in range(num_tests):
         files[f"test/tns{i}/BUILD"] = dedent(
-            f"""\
+            """\
             clojure_tests(
                 name='tests',
                 dependencies=[

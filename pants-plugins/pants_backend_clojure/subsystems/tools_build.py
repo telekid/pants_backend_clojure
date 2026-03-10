@@ -54,15 +54,17 @@ async def get_tools_build_classpath(
     """Fetch the tools.build classpath using Coursier."""
     return await materialize_classpath_for_tool(
         ToolClasspathRequest(
-            artifact_requirements=ArtifactRequirements([
-                ArtifactRequirement(
-                    coordinate=Coordinate(
-                        group="io.github.clojure",
-                        artifact="tools.build",
-                        version=tools_build.version,
-                    )
-                ),
-            ]),
+            artifact_requirements=ArtifactRequirements(
+                [
+                    ArtifactRequirement(
+                        coordinate=Coordinate(
+                            group="io.github.clojure",
+                            artifact="tools.build",
+                            version=tools_build.version,
+                        )
+                    ),
+                ]
+            ),
         ),
     )
 

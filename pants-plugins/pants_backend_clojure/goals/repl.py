@@ -3,6 +3,27 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from pants.core.goals.repl import ReplImplementation, ReplRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.core.util_rules.system_binaries import BashBinary
+from pants.engine.addresses import Address, Addresses
+from pants.engine.fs import MergeDigests
+from pants.engine.internals.graph import find_all_targets, transitive_targets
+from pants.engine.intrinsics import merge_digests
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import AllTargets, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.unions import UnionRule
+from pants.jvm.classpath import Classpath
+from pants.jvm.classpath import classpath as classpath_get
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, prepare_jdk_environment
+from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
+from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import JvmJdkField, JvmResolveField
+from pants.option.option_types import BoolOption, IntOption, StrOption
+from pants.option.subsystem import Subsystem
+from pants.util.logging import LogLevel
+
 from pants_backend_clojure.namespace_analysis import (
     ClojureNamespaceAnalysisRequest,
     analyze_clojure_namespaces,
@@ -14,30 +35,9 @@ from pants_backend_clojure.target_types import (
     ClojureTestTarget,
 )
 from pants_backend_clojure.utils.source_roots import determine_source_root
-from pants.core.goals.repl import ReplImplementation, ReplRequest
-from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
-from pants.core.util_rules.system_binaries import BashBinary
-from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import MergeDigests
-from pants.engine.internals.graph import find_all_targets, transitive_targets
-from pants.engine.intrinsics import merge_digests
-from pants.engine.rules import collect_rules, concurrently, implicitly, rule
-from pants.engine.target import AllTargets, TransitiveTargetsRequest
-from pants.engine.unions import UnionRule
-from pants.jvm.classpath import Classpath, classpath as classpath_get
-from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, prepare_jdk_environment
-from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, Coordinate
-from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
-from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmJdkField, JvmResolveField
-from pants.option.option_types import BoolOption, IntOption, StrOption
-from pants.option.subsystem import Subsystem
-from pants.util.logging import LogLevel
 
 
-def _prepare_repl_for_workspace(
-    argv: Iterable[str], env: dict[str, str], jdk: JdkEnvironment
-) -> tuple[tuple[str, ...], dict[str, str]]:
+def _prepare_repl_for_workspace(argv: Iterable[str], env: dict[str, str], jdk: JdkEnvironment) -> tuple[tuple[str, ...], dict[str, str]]:
     """Prepare argv and env for run_in_workspace=True by prefixing paths with {chroot}/.
 
     When run_in_workspace=True, the REPL runs in the user's workspace directory,
@@ -47,6 +47,7 @@ def _prepare_repl_for_workspace(
 
     This follows the pattern from pants.jvm.run._post_process_jvm_process.
     """
+
     def prefixed(arg: str, prefixes: Iterable[str]) -> str:
         # Check if any component of a colon-separated path starts with a prefix
         # (e.g., classpath entries in -cp argument)
@@ -143,9 +144,7 @@ class RebelSubsystem(Subsystem):
     )
 
 
-async def _get_all_clojure_targets_in_resolve(
-    all_targets: AllTargets, jvm: JvmSubsystem, resolve_name: str
-) -> tuple[Address, ...]:
+async def _get_all_clojure_targets_in_resolve(all_targets: AllTargets, jvm: JvmSubsystem, resolve_name: str) -> tuple[Address, ...]:
     """Get all Clojure source and test targets in a specific resolve.
 
     This is used to load all sources in a resolve, enabling you to require any
@@ -184,29 +183,20 @@ async def _gather_source_roots(addresses: Addresses) -> set[str]:
 
     for tgt in trans_targets.closure:
         if isinstance(tgt, ClojureSourceTarget) and tgt.has_field(ClojureSourceField):
-            source_files_requests.append(
-                SourceFilesRequest([tgt[ClojureSourceField]])
-            )
+            source_files_requests.append(SourceFilesRequest([tgt[ClojureSourceField]]))
             clojure_targets.append(tgt)
         elif isinstance(tgt, ClojureTestTarget) and tgt.has_field(ClojureTestSourceField):
-            source_files_requests.append(
-                SourceFilesRequest([tgt[ClojureTestSourceField]])
-            )
+            source_files_requests.append(SourceFilesRequest([tgt[ClojureTestSourceField]]))
             clojure_targets.append(tgt)
 
     if not source_files_requests:
         return set()
 
-    all_source_files = await concurrently(
-        determine_source_files(req) for req in source_files_requests
-    )
+    all_source_files = await concurrently(determine_source_files(req) for req in source_files_requests)
 
     # Use clj-kondo analysis to extract namespaces
     all_analyses = await concurrently(
-        analyze_clojure_namespaces(
-            ClojureNamespaceAnalysisRequest(sf.snapshot), **implicitly()
-        )
-        for sf in all_source_files
+        analyze_clojure_namespaces(ClojureNamespaceAnalysisRequest(sf.snapshot), **implicitly()) for sf in all_source_files
     )
 
     # Determine source roots from namespaces
@@ -274,9 +264,7 @@ async def _prepare_repl_setup(
     # If load_resolve_sources is enabled, expand to all targets in the resolve
     if load_resolve_sources and addresses:
         # Get transitive targets to determine the resolve
-        initial_transitive = await transitive_targets(
-            TransitiveTargetsRequest(addresses), **implicitly()
-        )
+        initial_transitive = await transitive_targets(TransitiveTargetsRequest(addresses), **implicitly())
 
         # Find the resolve from the first root target
         resolve_name = None
@@ -288,9 +276,7 @@ async def _prepare_repl_setup(
         # If we found a resolve, get all Clojure targets in that resolve
         if resolve_name:
             all_tgts = await find_all_targets(**implicitly())
-            resolve_addresses = await _get_all_clojure_targets_in_resolve(
-                all_tgts, jvm, resolve_name
-            )
+            resolve_addresses = await _get_all_clojure_targets_in_resolve(all_tgts, jvm, resolve_name)
             # Merge with original addresses to ensure they're included
             addresses_to_load = Addresses(sorted(set(addresses) | set(resolve_addresses)))
 
@@ -414,10 +400,12 @@ async def create_nrepl_request(
     # For run_in_workspace=True, don't include source files in digest - they'll be
     # loaded from the workspace. Only include classpath JARs and nREPL.
     input_digest = await merge_digests(
-        MergeDigests([
-            *setup.classpath.digests(),
-            nrepl_classpath.digest,
-        ]),
+        MergeDigests(
+            [
+                *setup.classpath.digests(),
+                nrepl_classpath.digest,
+            ]
+        ),
     )
 
     # Build nREPL server startup command
@@ -434,11 +422,11 @@ async def create_nrepl_request(
     # Command to start nREPL server and keep it running
     # The server is stored in an atom and we use deref (@) to block indefinitely
     nrepl_start_code = (
-        f'(require (quote nrepl.server)) '
+        f"(require (quote nrepl.server)) "
         f'(let [server (nrepl.server/start-server :bind "{host}" :port {port})] '
-        f'(println server) '
+        f"(println server) "
         f'(println "nREPL server started on port {port}") '
-        f'@(promise))'  # Block forever
+        f"@(promise))"  # Block forever
     )
 
     argv = [
@@ -505,10 +493,12 @@ async def create_rebel_repl_request(
     # For run_in_workspace=True, don't include source files in digest - they'll be
     # loaded from the workspace. Only include classpath JARs and Rebel Readline.
     input_digest = await merge_digests(
-        MergeDigests([
-            *setup.classpath.digests(),
-            rebel_classpath.digest,
-        ]),
+        MergeDigests(
+            [
+                *setup.classpath.digests(),
+                rebel_classpath.digest,
+            ]
+        ),
     )
 
     # Build Rebel Readline REPL startup command

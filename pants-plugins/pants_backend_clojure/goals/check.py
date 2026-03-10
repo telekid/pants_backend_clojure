@@ -5,23 +5,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest, determine_source_files
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles, strip_source_roots
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.addresses import Addresses
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, FileContent, MergeDigests
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests
-from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
-from pants.jvm.classpath import Classpath, classpath
-from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess, jvm_process, prepare_jdk_environment
+from pants.jvm.classpath import classpath
+from pants.jvm.jdk_rules import JdkRequest, JvmProcess, jvm_process, prepare_jdk_environment
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmJdkField, JvmResolveField
 from pants.util.logging import LogLevel
 
 from pants_backend_clojure.namespace_analysis import (
-    ClojureNamespaceAnalysis,
     ClojureNamespaceAnalysisRequest,
     analyze_clojure_namespaces,
 )
@@ -53,8 +51,6 @@ class ClojureCheckFieldSetRequest:
     field_set: ClojureCheckFieldSet
 
 
-
-
 def _create_loader_script(namespaces: list[str], config: ClojureCheckSubsystem) -> str:
     """Generate a Clojure script that loads all namespaces and reports errors."""
 
@@ -62,7 +58,7 @@ def _create_loader_script(namespaces: list[str], config: ClojureCheckSubsystem) 
     ns_count = len(namespaces)
 
     # Note: Using actual checkmarks and X symbols for output
-    return f'''(require 'clojure.main)
+    return f"""(require 'clojure.main)
 
 (def failed (atom false))
 (def error-messages (atom []))
@@ -97,7 +93,7 @@ def _create_loader_script(namespaces: list[str], config: ClojureCheckSubsystem) 
   (do
     (println "Check PASSED - All namespaces loaded successfully")
     (System/exit 0)))
-'''
+"""
 
 
 @rule(desc="Check single Clojure field set", level=LogLevel.DEBUG)
@@ -164,11 +160,13 @@ async def check_clojure_field_set(
 
     # Merge loader script with sources and classpath digests
     input_digest = await merge_digests(
-        MergeDigests([
-            loader_digest,
-            stripped_sources.snapshot.digest,
-            *clspath.digests(),
-        ])
+        MergeDigests(
+            [
+                loader_digest,
+                stripped_sources.snapshot.digest,
+                *clspath.digests(),
+            ]
+        )
     )
 
     # Build JVM command with additional args if provided
@@ -215,8 +213,7 @@ async def check_clojure(
 
     # Process all field sets in parallel using concurrently
     results = await concurrently(
-        check_clojure_field_set(ClojureCheckFieldSetRequest(field_set), **implicitly())
-        for field_set in request.field_sets
+        check_clojure_field_set(ClojureCheckFieldSetRequest(field_set), **implicitly()) for field_set in request.field_sets
     )
 
     return CheckResults(results, checker_name="Clojure check")

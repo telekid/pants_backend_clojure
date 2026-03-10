@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from pants_backend_clojure.clojure_symbol_mapping import (
     _namespace_matches_pattern,
 )
@@ -43,23 +41,15 @@ class TestNamespaceMatchesPattern:
 
     def test_deep_nesting(self) -> None:
         """Test deeply nested namespace matching."""
-        assert _namespace_matches_pattern(
-            "ring.middleware.anti-forgery.impl.detail", "ring.**"
-        ) is True
-        assert _namespace_matches_pattern(
-            "ring.middleware.anti-forgery.impl.detail", "ring.middleware.**"
-        ) is True
-        assert _namespace_matches_pattern(
-            "ring.middleware.anti-forgery.impl.detail", "ring.middleware.anti-forgery.**"
-        ) is True
+        assert _namespace_matches_pattern("ring.middleware.anti-forgery.impl.detail", "ring.**") is True
+        assert _namespace_matches_pattern("ring.middleware.anti-forgery.impl.detail", "ring.middleware.**") is True
+        assert _namespace_matches_pattern("ring.middleware.anti-forgery.impl.detail", "ring.middleware.anti-forgery.**") is True
 
     def test_hyphenated_namespaces(self) -> None:
         """Test namespaces with hyphens (common in Clojure)."""
         assert _namespace_matches_pattern("my-app.core", "my-app.**") is True
         assert _namespace_matches_pattern("ring.middleware.anti-forgery", "ring.**") is True
-        assert _namespace_matches_pattern(
-            "clojure.tools.logging", "clojure.tools.**"
-        ) is True
+        assert _namespace_matches_pattern("clojure.tools.logging", "clojure.tools.**") is True
 
     def test_single_segment_namespace(self) -> None:
         """Test single-segment namespaces."""
@@ -74,4 +64,5 @@ class TestClojureNamespaceMapping:
     These would require a full RuleRunner setup with JVM subsystem configuration,
     which is more involved. The basic tests above verify the pattern matching logic.
     """
+
     pass

@@ -26,7 +26,7 @@ def namespace_to_path(namespace: str) -> str:
     Note:
         Clojure uses underscores in file paths for hyphens in namespaces.
     """
-    path = namespace.replace('.', '/').replace('-', '_')
+    path = namespace.replace(".", "/").replace("-", "_")
     return f"{path}.clj"
 
 
@@ -47,13 +47,13 @@ def path_to_namespace(file_path: str) -> str:
     """
     # Remove .clj or .cljc extension
     path = file_path
-    if path.endswith('.clj'):
+    if path.endswith(".clj"):
         path = path[:-4]
-    elif path.endswith('.cljc'):
+    elif path.endswith(".cljc"):
         path = path[:-5]
 
     # Convert path separators to dots and underscores to hyphens
-    namespace = path.replace('/', '.').replace('_', '-')
+    namespace = path.replace("/", ".").replace("_", "-")
     return namespace
 
 
@@ -75,10 +75,10 @@ def class_to_path(class_name: str) -> str:
         Inner classes (containing $) are mapped to their outer class file.
     """
     # Handle inner classes by taking only the outer class
-    if '$' in class_name:
-        class_name = class_name.split('$')[0]
+    if "$" in class_name:
+        class_name = class_name.split("$")[0]
 
-    path = class_name.replace('.', '/')
+    path = class_name.replace(".", "/")
     return f"{path}.java"
 
 

@@ -8,14 +8,11 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-import pytest
-
 from pants_backend_clojure.utils.jar_analyzer import (
     analyze_jar_for_namespaces,
     is_clojure_jar,
     namespace_from_class_path,
 )
-
 
 # ===== Helper functions for creating test JARs =====
 
@@ -29,10 +26,10 @@ def create_test_jar(files: dict[str, str]) -> Path:
     Returns:
         Path to the created JAR file.
     """
-    jar_file = tempfile.NamedTemporaryFile(suffix='.jar', delete=False)
+    jar_file = tempfile.NamedTemporaryFile(suffix=".jar", delete=False)
     jar_path = Path(jar_file.name)
 
-    with zipfile.ZipFile(jar_path, 'w') as jar:
+    with zipfile.ZipFile(jar_path, "w") as jar:
         for path, content in files.items():
             jar.writestr(path, content)
 
@@ -81,9 +78,7 @@ def test_namespace_from_class_path_non_class():
 
 def test_analyze_jar_with_single_clj_source():
     """Test analyzing a JAR with a single Clojure source file."""
-    jar_path = create_test_jar({
-        "clojure/data/json.clj": "(ns clojure.data.json)\n\n(defn read-str [s] s)"
-    })
+    jar_path = create_test_jar({"clojure/data/json.clj": "(ns clojure.data.json)\n\n(defn read-str [s] s)"})
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -94,11 +89,13 @@ def test_analyze_jar_with_single_clj_source():
 
 def test_analyze_jar_with_multiple_clj_sources():
     """Test analyzing a JAR with multiple Clojure source files."""
-    jar_path = create_test_jar({
-        "clojure/data/json.clj": "(ns clojure.data.json)",
-        "clojure/data/json/util.clj": "(ns clojure.data.json.util)",
-        "clojure/data/json/parser.clj": "(ns clojure.data.json.parser)",
-    })
+    jar_path = create_test_jar(
+        {
+            "clojure/data/json.clj": "(ns clojure.data.json)",
+            "clojure/data/json/util.clj": "(ns clojure.data.json.util)",
+            "clojure/data/json/parser.clj": "(ns clojure.data.json.parser)",
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -114,9 +111,11 @@ def test_analyze_jar_with_multiple_clj_sources():
 
 def test_analyze_jar_with_cljc_source():
     """Test analyzing a JAR with .cljc (Clojure/ClojureScript) files."""
-    jar_path = create_test_jar({
-        "clojure/data/json.cljc": "(ns clojure.data.json)",
-    })
+    jar_path = create_test_jar(
+        {
+            "clojure/data/json.cljc": "(ns clojure.data.json)",
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -127,9 +126,11 @@ def test_analyze_jar_with_cljc_source():
 
 def test_analyze_jar_with_clje_source():
     """Test analyzing a JAR with .clje files."""
-    jar_path = create_test_jar({
-        "clojure/data/json.clje": "(ns clojure.data.json)",
-    })
+    jar_path = create_test_jar(
+        {
+            "clojure/data/json.clje": "(ns clojure.data.json)",
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -140,10 +141,12 @@ def test_analyze_jar_with_clje_source():
 
 def test_analyze_jar_ignores_metainf():
     """Test that files in META-INF/ are ignored."""
-    jar_path = create_test_jar({
-        "clojure/data/json.clj": "(ns clojure.data.json)",
-        "META-INF/something.clj": "(ns meta.inf.something)",
-    })
+    jar_path = create_test_jar(
+        {
+            "clojure/data/json.clj": "(ns clojure.data.json)",
+            "META-INF/something.clj": "(ns meta.inf.something)",
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -155,10 +158,12 @@ def test_analyze_jar_ignores_metainf():
 
 def test_analyze_jar_with_complex_namespace():
     """Test analyzing namespaces with hyphens (converted to underscores in paths)."""
-    jar_path = create_test_jar({
-        "clojure/tools/logging.clj": "(ns clojure.tools.logging)",
-        "ring/middleware/anti_forgery.clj": "(ns ring.middleware.anti-forgery)",
-    })
+    jar_path = create_test_jar(
+        {
+            "clojure/tools/logging.clj": "(ns clojure.tools.logging)",
+            "ring/middleware/anti_forgery.clj": "(ns ring.middleware.anti-forgery)",
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -175,11 +180,13 @@ def test_analyze_jar_with_complex_namespace():
 
 def test_analyze_jar_with_aot_compiled_classes():
     """Test analyzing an AOT-compiled JAR with only .class files."""
-    jar_path = create_test_jar({
-        "clojure/data/json.class": b"fake class content",
-        "clojure/data/json__init.class": b"fake init class",
-        "clojure/data/json$read_str.class": b"fake function class",
-    })
+    jar_path = create_test_jar(
+        {
+            "clojure/data/json.class": b"fake class content",
+            "clojure/data/json__init.class": b"fake init class",
+            "clojure/data/json$read_str.class": b"fake function class",
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -191,11 +198,13 @@ def test_analyze_jar_with_aot_compiled_classes():
 
 def test_analyze_jar_with_aot_hyphenated_namespaces():
     """Test analyzing AOT JARs with hyphenated namespaces (demunge heuristic)."""
-    jar_path = create_test_jar({
-        "my_app/core__init.class": b"fake init class",
-        "my_app/core.class": b"fake class",
-        "my_app/core$main.class": b"fake function class",
-    })
+    jar_path = create_test_jar(
+        {
+            "my_app/core__init.class": b"fake init class",
+            "my_app/core.class": b"fake class",
+            "my_app/core$main.class": b"fake function class",
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -207,12 +216,14 @@ def test_analyze_jar_with_aot_hyphenated_namespaces():
 
 def test_analyze_jar_prefers_source_over_classes():
     """Test that source files are preferred over class files."""
-    jar_path = create_test_jar({
-        # Source file with actual namespace
-        "clojure/data/json.clj": "(ns clojure.data.json)",
-        # Class files that might suggest different namespaces
-        "clojure/data/xml.class": b"fake class",
-    })
+    jar_path = create_test_jar(
+        {
+            # Source file with actual namespace
+            "clojure/data/json.clj": "(ns clojure.data.json)",
+            # Class files that might suggest different namespaces
+            "clojure/data/xml.class": b"fake class",
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -239,10 +250,12 @@ def test_analyze_empty_jar():
 
 def test_analyze_jar_with_no_clojure_content():
     """Test analyzing a JAR with no Clojure files (pure Java JAR)."""
-    jar_path = create_test_jar({
-        "com/example/Util.class": b"fake java class",
-        "META-INF/MANIFEST.MF": "Manifest-Version: 1.0",
-    })
+    jar_path = create_test_jar(
+        {
+            "com/example/Util.class": b"fake java class",
+            "META-INF/MANIFEST.MF": "Manifest-Version: 1.0",
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -255,11 +268,13 @@ def test_analyze_jar_with_no_clojure_content():
 
 def test_analyze_jar_with_invalid_namespace():
     """Test handling of files with malformed namespace declarations."""
-    jar_path = create_test_jar({
-        "clojure/data/json.clj": "(ns clojure.data.json)",
-        "invalid.clj": "this is not valid clojure code",
-        "another.clj": "(defn foo [])",  # No namespace declaration
-    })
+    jar_path = create_test_jar(
+        {
+            "clojure/data/json.clj": "(ns clojure.data.json)",
+            "invalid.clj": "this is not valid clojure code",
+            "another.clj": "(defn foo [])",  # No namespace declaration
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -271,12 +286,14 @@ def test_analyze_jar_with_invalid_namespace():
 
 def test_analyze_jar_with_non_utf8():
     """Test handling of non-UTF8 content."""
-    jar_path = create_test_jar({
-        "clojure/data/json.clj": "(ns clojure.data.json)",
-    })
+    jar_path = create_test_jar(
+        {
+            "clojure/data/json.clj": "(ns clojure.data.json)",
+        }
+    )
 
     # Add a file with invalid UTF-8
-    with zipfile.ZipFile(jar_path, 'a') as jar:
+    with zipfile.ZipFile(jar_path, "a") as jar:
         jar.writestr("invalid.clj", b"\xff\xfe invalid bytes")
 
     try:
@@ -290,7 +307,7 @@ def test_analyze_jar_with_non_utf8():
 def test_analyze_invalid_jar():
     """Test analyzing a corrupted/invalid JAR file."""
     # Create a file that's not a valid ZIP/JAR
-    jar_path = Path(tempfile.mktemp(suffix='.jar'))
+    jar_path = Path(tempfile.mktemp(suffix=".jar"))
     jar_path.write_text("this is not a valid JAR file")
 
     try:
@@ -306,9 +323,11 @@ def test_analyze_invalid_jar():
 
 def test_is_clojure_jar_with_source():
     """Test detecting Clojure JAR by presence of .clj files."""
-    jar_path = create_test_jar({
-        "clojure/data/json.clj": "(ns clojure.data.json)",
-    })
+    jar_path = create_test_jar(
+        {
+            "clojure/data/json.clj": "(ns clojure.data.json)",
+        }
+    )
 
     try:
         assert is_clojure_jar(jar_path) is True
@@ -318,9 +337,11 @@ def test_is_clojure_jar_with_source():
 
 def test_is_clojure_jar_with_common_namespace():
     """Test detecting Clojure JAR by common namespace prefixes."""
-    jar_path = create_test_jar({
-        "clojure/core/async.class": b"fake class",
-    })
+    jar_path = create_test_jar(
+        {
+            "clojure/core/async.class": b"fake class",
+        }
+    )
 
     try:
         assert is_clojure_jar(jar_path) is True
@@ -330,10 +351,12 @@ def test_is_clojure_jar_with_common_namespace():
 
 def test_is_not_clojure_jar():
     """Test that pure Java JARs are not detected as Clojure."""
-    jar_path = create_test_jar({
-        "com/example/Util.class": b"fake java class",
-        "META-INF/MANIFEST.MF": "Manifest-Version: 1.0",
-    })
+    jar_path = create_test_jar(
+        {
+            "com/example/Util.class": b"fake java class",
+            "META-INF/MANIFEST.MF": "Manifest-Version: 1.0",
+        }
+    )
 
     try:
         # This might return True since our heuristic isn't perfect
@@ -347,7 +370,7 @@ def test_is_not_clojure_jar():
 
 def test_is_clojure_jar_invalid_jar():
     """Test handling invalid JAR files."""
-    jar_path = Path(tempfile.mktemp(suffix='.jar'))
+    jar_path = Path(tempfile.mktemp(suffix=".jar"))
     jar_path.write_text("not a jar")
 
     try:
@@ -362,17 +385,19 @@ def test_is_clojure_jar_invalid_jar():
 def test_analyze_realistic_source_jar():
     """Test analyzing a realistic Clojure library JAR (simulated)."""
     # Simulate a JAR like org.clojure/data.json
-    jar_path = create_test_jar({
-        "clojure/data/json.clj": """(ns clojure.data.json
+    jar_path = create_test_jar(
+        {
+            "clojure/data/json.clj": """(ns clojure.data.json
           "JSON parser/generator to/from Clojure data structures."
           (:require [clojure.string :as str]))
 
         (defn read-str [s] s)
         (defn write-str [x] x)
         """,
-        "META-INF/MANIFEST.MF": "Manifest-Version: 1.0\n",
-        "META-INF/maven/org.clojure/data.json/pom.properties": "version=2.4.0\n",
-    })
+            "META-INF/MANIFEST.MF": "Manifest-Version: 1.0\n",
+            "META-INF/maven/org.clojure/data.json/pom.properties": "version=2.4.0\n",
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
@@ -384,13 +409,15 @@ def test_analyze_realistic_source_jar():
 def test_analyze_realistic_multi_namespace_jar():
     """Test analyzing a JAR with multiple namespaces (like core.async)."""
     # Simulate a JAR like org.clojure/core.async
-    jar_path = create_test_jar({
-        "clojure/core/async.clj": "(ns clojure.core.async)",
-        "clojure/core/async/impl/protocols.clj": "(ns clojure.core.async.impl.protocols)",
-        "clojure/core/async/impl/channels.clj": "(ns clojure.core.async.impl.channels)",
-        "clojure/core/async/impl/buffers.clj": "(ns clojure.core.async.impl.buffers)",
-        "clojure/core/async/impl/dispatch.clj": "(ns clojure.core.async.impl.dispatch)",
-    })
+    jar_path = create_test_jar(
+        {
+            "clojure/core/async.clj": "(ns clojure.core.async)",
+            "clojure/core/async/impl/protocols.clj": "(ns clojure.core.async.impl.protocols)",
+            "clojure/core/async/impl/channels.clj": "(ns clojure.core.async.impl.channels)",
+            "clojure/core/async/impl/buffers.clj": "(ns clojure.core.async.impl.buffers)",
+            "clojure/core/async/impl/dispatch.clj": "(ns clojure.core.async.impl.dispatch)",
+        }
+    )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)

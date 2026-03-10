@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pants_backend_clojure.subsystems.clojure_infer import ClojureInferSubsystem
 from pants.testutil.option_util import create_subsystem
+from pants_backend_clojure.subsystems.clojure_infer import ClojureInferSubsystem
 
 
 def test_default_options() -> None:
