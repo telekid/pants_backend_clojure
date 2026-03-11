@@ -23,6 +23,11 @@ from pants.engine.target import (
     InferredDependencies,
 )
 from pants.engine.unions import UnionRule
+from pants.jvm.dependency_inference.artifact_mapper import (
+    AllJvmArtifactTargets,
+    UnversionedCoordinate,
+    find_jvm_artifacts_or_raise,
+)
 from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmDependenciesField, JvmResolveField
@@ -256,9 +261,69 @@ async def infer_clojure_test_dependencies(
     return await _infer_clojure_dependencies_impl(request.field_set, jvm, symbol_mapping, clojure_mapping)
 
 
+@dataclass(frozen=True)
+class ClojureRuntimeDependencyInferenceFieldSet(FieldSet):
+    """FieldSet for injecting the Clojure runtime dependency."""
+
+    required_fields = (ClojureSourceField, JvmDependenciesField, JvmResolveField)
+
+    dependencies: JvmDependenciesField
+    resolve: JvmResolveField
+
+
+class InferClojureRuntimeDependencyRequest(InferDependenciesRequest):
+    """Request to infer the Clojure runtime dependency for Clojure targets."""
+
+    infer_from = ClojureRuntimeDependencyInferenceFieldSet
+
+
+@dataclass(frozen=True)
+class ClojureRuntimeForResolveRequest:
+    resolve_name: str
+
+
+@dataclass(frozen=True)
+class ClojureRuntimeForResolve:
+    addresses: frozenset[Address]
+
+
+@rule
+async def resolve_clojure_runtime_for_resolve(
+    request: ClojureRuntimeForResolveRequest,
+    jvm_artifact_targets: AllJvmArtifactTargets,
+    jvm: JvmSubsystem,
+) -> ClojureRuntimeForResolve:
+    addresses = find_jvm_artifacts_or_raise(
+        required_coordinates=[
+            UnversionedCoordinate(
+                group="org.clojure",
+                artifact="clojure",
+            ),
+        ],
+        resolve=request.resolve_name,
+        jvm_artifact_targets=jvm_artifact_targets,
+        jvm=jvm,
+        subsystem="the Clojure runtime",
+        target_type="clojure_sources",
+        requirement_source="Clojure source targets require a `jvm_artifact` for `org.clojure:clojure` in their resolve",
+    )
+    return ClojureRuntimeForResolve(addresses)
+
+
+@rule(desc="Infer dependency on Clojure runtime for Clojure targets.")
+async def infer_clojure_runtime_dependency(
+    request: InferClojureRuntimeDependencyRequest,
+    jvm: JvmSubsystem,
+) -> InferredDependencies:
+    resolve = request.field_set.resolve.normalized_value(jvm)
+    clojure_runtime = await resolve_clojure_runtime_for_resolve(ClojureRuntimeForResolveRequest(resolve), **implicitly())
+    return InferredDependencies(clojure_runtime.addresses)
+
+
 def rules():
     return [
         *collect_rules(),
         UnionRule(InferDependenciesRequest, InferClojureSourceDependencies),
         UnionRule(InferDependenciesRequest, InferClojureTestDependencies),
+        UnionRule(InferDependenciesRequest, InferClojureRuntimeDependencyRequest),
     ]
