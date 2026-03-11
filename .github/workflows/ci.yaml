@@ -33,10 +33,10 @@ jobs:
           named-caches-hash: ${{ hashFiles('locks/**') }}
 
       - name: Lint and typecheck
-        run: pants lint check ::
+        run: "pants lint check ::"
 
       - name: Run tests
-        run: pants test pants-plugins::
+        run: "pants test pants-plugins::"
 
       - name: Package wheel
         run: pants package pants-plugins:wheel

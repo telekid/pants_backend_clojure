@@ -45,7 +45,7 @@ jobs:
           named-caches-hash: ${{ hashFiles('locks/**') }}
 
       - name: Run tests
-        run: pants test pants-plugins::
+        run: "pants test pants-plugins::"
 
       - name: Package the plugin
         id: package
