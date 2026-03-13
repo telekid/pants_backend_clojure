@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.30.0"
+pants_version = "2.31.0"
 process_execution_local_enable_nailgun = false
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages = [
@@ -22,9 +22,14 @@ marker_filenames = ["BUILD"]
 [python]
 enable_resolves = true
 interpreter_constraints = ["==3.11.*"]
+default_resolve = "pants-2.31"
 
 [python.resolves]
-pants-plugins = "locks/python/pants-plugins.lock.jsonc"
+"pants-2.31" = "3rdparty/python/pants-2.31.lock"
+"pants-2.30" = "3rdparty/python/pants-2.30.lock"
+
+[python-repos]
+find_links = ["https://wheels.pantsbuild.org/simple"]
 
 [coursier]
 repos = [
