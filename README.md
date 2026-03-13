@@ -56,6 +56,7 @@ Anyhow, back to your regularly scheduled AI generated readme doc:
 - **Packaging**: Build uberjars with AOT compilation and direct linking
 - **JVM Integration**: Works with Pants' JVM support for mixed Clojure/Java projects
 - **Provided Dependencies**: Maven-style provided scope for excluding runtime dependencies
+- **IDE Integration**: Generate `deps.edn` from your Pants project for use with Cursive, Calva, or any Clojure-aware IDE
 
 ## Installation
 
@@ -205,6 +206,38 @@ The main namespace must include `(:gen-class)` and define a `-main` function:
 | Format | `pants fmt ::` | Format code with cljfmt |
 | Check | `pants check ::` | Verify code compiles |
 | Package | `pants package path/to:jar` | Build an uberjar |
+| Generate deps.edn | `pants generate-deps-edn` | Generate a deps.edn for IDE and tool integration |
+
+## IDE and Tooling Integration
+
+Pants manages your dependencies, source roots, and resolves — but your IDE doesn't know about any of that. The `generate-deps-edn` goal bridges this gap by producing a `deps.edn` file from your Pants project, so you can open it in Cursive, Calva, CIDER, or any tool that understands `deps.edn`.
+
+```bash
+pants generate-deps-edn
+```
+
+The generated `deps.edn` includes:
+- All source paths discovered from your `clojure_sources` targets
+- All Maven dependencies from your Pants lockfile
+- A `:test` alias with your test source paths
+- `:nrepl` and `:rebel` aliases for REPL convenience
+- Maven repository configuration from your `pants.toml`
+
+If you have multiple JVM resolves, specify which one to generate for:
+
+```bash
+pants generate-deps-edn --resolve=java21
+```
+
+You can also control where the file is written:
+
+```bash
+pants generate-deps-edn --output-path=deps-java21.edn
+```
+
+This also works well as an integration point for Clojure tools that aren't directly supported by this plugin but do support `deps.edn` — test runners, documentation generators, static analysis tools, and so on.
+
+You'll probably want to add `deps.edn` to your `.gitignore` since it's a generated file.
 
 ## Configuration
 
