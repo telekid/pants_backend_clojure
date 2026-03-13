@@ -64,7 +64,7 @@ Add the plugin to your `pants.toml`:
 ```toml
 [GLOBAL]
 pants_version = "2.30.0"
-plugins = ["pants-backend-clojure==0.1.0"]
+plugins = ["pants-backend-clojure==0.1.1"]
 backend_packages = [
     "pants.backend.experimental.java",
     "pants_backend_clojure",
