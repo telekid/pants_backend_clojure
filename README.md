@@ -64,7 +64,7 @@ Add the plugin to your `pants.toml`:
 
 ```toml
 [GLOBAL]
-pants_version = "2.30.0"
+pants_version = "2.31.0"
 plugins = ["pants-backend-clojure==0.1.2"]
 backend_packages = [
     "pants.backend.experimental.java",
@@ -277,6 +277,33 @@ clojure_source(
   - Debian/Ubuntu: `apt-get install zip unzip`
   - RHEL/Fedora: `dnf install zip unzip`
   - Alpine: `apk add zip unzip`
+
+## Known Issues
+
+### Coursier drops transitive dependencies
+
+Pants uses [Coursier](https://get-coursier.io/) to resolve JVM dependencies. There is a [known bug](https://github.com/pantsbuild/pants/issues/22909) where Coursier's locking fails to include transitive dependencies when you request a non-default version of an intermediate dependency. This can cause missing dependency errors during compilation or at runtime.
+
+The fix is available in Coursier v2.1.25-M19 but has not yet been released as a stable version. Until then, you can work around this by pinning the Coursier version in your `pants.toml`:
+
+```toml
+[coursier]
+version = "v2.1.25-M19"
+repos = [
+  "https://repo.clojars.org/",
+  "https://maven-central.storage-download.googleapis.com/maven2",
+  "https://repo1.maven.org/maven2",
+  # add any other remote repos here
+]
+known_versions = [
+  "v2.1.25-M19|macos_x86_64|86298db922051950acac686988b42ab7756359befe24f315ee72124c2b12b3c3|82018352",
+  "v2.1.25-M19|macos_arm64|7e5fc9510fa08c3f98eb36c5801e4d7605e3f4d3d6bc43fdcd47658dd56bb316|27061694|https://github.com/coursier/coursier/releases/download/v2.1.25-M19/cs-aarch64-apple-darwin.gz",
+  "v2.1.25-M19|linux_x86_64|13fc9bc82f2e4a38a60cf801ff9399c398644c7e5e4b8cf5116ef80aa4691312|28365130",
+  "v2.1.25-M19|linux_arm64|a7bbad42163c4fde4cb1191ccfd11261c21873023c495ba7494ca109de4da761|85679032|https://github.com/coursier/coursier/releases/download/v2.1.25-M19/cs-aarch64-pc-linux.gz",
+]
+```
+
+This should be resolved once Coursier releases a stable v2.1.25+.
 
 ## Contributing
 
