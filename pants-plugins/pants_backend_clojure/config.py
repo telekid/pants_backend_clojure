@@ -9,8 +9,8 @@ from __future__ import annotations
 # Default tool versions (can be overridden via subsystems)
 DEFAULT_NREPL_VERSION = "1.4.0"
 DEFAULT_REBEL_VERSION = "0.1.4"
-DEFAULT_CLJFMT_VERSION = "0.14.0"
-DEFAULT_CLJ_KONDO_VERSION = "2025.10.23"
+DEFAULT_CLJFMT_VERSION = "0.16.2"
+DEFAULT_CLJ_KONDO_VERSION = "2026.01.19"
 
 # File extensions
 CLOJURE_SOURCE_EXTENSIONS = (".clj", ".cljc")

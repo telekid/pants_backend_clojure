@@ -247,10 +247,10 @@ Override default tool versions in `pants.toml`:
 
 ```toml
 [clj-kondo]
-version = "2025.10.23"
+version = "2026.01.19"
 
 [cljfmt]
-version = "0.14.0"
+version = "0.16.2"
 
 [nrepl]
 version = "1.4.0"

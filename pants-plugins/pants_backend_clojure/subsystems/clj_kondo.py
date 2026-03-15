@@ -21,12 +21,12 @@ class CljKondo(ExternalTool):
     name = "clj-kondo"
     help = "Lint Clojure code using clj-kondo."
 
-    default_version = "2025.10.23"
+    default_version = "2026.01.19"
     default_known_versions = [
-        "2025.10.23|linux_x86_64|7d3e563668ec4e8da164c78ed1a9264b5f442a2933c4934c6d0a06652bbfe494|20530383",
-        "2025.10.23|linux_arm64|75c90f734caac87e1cabb163fbe2201a2e985f6be72eb1e0f132a7f774b33fcb|20325538",
-        "2025.10.23|macos_x86_64|b6876f9311f2998cce0df226adf4792eacf287cfeba9bd067f44d56650956970|18998940",
-        "2025.10.23|macos_arm64|9915429099bdb5d35ce0cc88e0e346d9be78a7fd44d9ea8689b19843927e3a07|19220185",
+        "2026.01.19|linux_x86_64|4a4e7bde622b0bd8c4fd368d3a8584690faa007f3ce72255ae63d4090f0e7c92|19754577",
+        "2026.01.19|linux_arm64|49b96cfe3d27528b50074226d10b3327412345e5b58d838157177bba45243f3a|19676029",
+        "2026.01.19|macos_x86_64|9b89f0265ccf8c6cdcb083708a07af5b4a29047ecae4d322646871dccd5640f5|18114413",
+        "2026.01.19|macos_arm64|911f3803be075d59172cb92f0d39aea077fc7550dcdc4e8c946d61552fa51a12|18433094",
     ]
 
     skip = SkipOption("lint")

@@ -20,16 +20,14 @@ class Cljfmt(ExternalTool):
     name = "cljfmt"
     help = "Format Clojure code using cljfmt."
 
-    default_version = "0.14.0"
+    default_version = "0.16.2"
     default_known_versions = [
         # Linux amd64 (static build)
-        "0.14.0|linux_x86_64|bc6ba1234417765866b8d3e7a795dfe10535656fdb9cea766cb53641dbac6233|10537219",
+        "0.16.2|linux_x86_64|e653468a7d8e0f23b6344d0c4ea1446eb6072b46ff0f87675ccbe6f43b987cc6|10564293",
         # Linux aarch64
-        "0.14.0|linux_arm64|2007c49596ba706dda7a0a472bffbe4b823f4dadd4e6ef6f2d4b24b142e8f89d|11219584",
-        # macOS amd64 (Intel)
-        "0.14.0|macos_x86_64|aa753197c1b0b4f4a1a7a51f2d4e0cc69c000b850374131d5b0074de7f52f1cc|10386743",
+        "0.16.2|linux_arm64|89ee200174443ca1a3a1eb175c29e8b7676e7cbeb10912d013873af810c6868a|11261773",
         # macOS aarch64 (Apple Silicon)
-        "0.14.0|macos_arm64|bd5160fe4fe0165a6996757acca0eab274b6d51e78e96989914e58a9dc06ef3e|10586633",
+        "0.16.2|macos_arm64|e59d2d0f3f62829b3f54ad302b34d39a363d447c10af9a09e90c4c27abb0d89d|10613688",
     ]
 
     skip = SkipOption("fmt", "lint")
