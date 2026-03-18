@@ -6,6 +6,7 @@ from typing import Any
 
 from pants.core.goals.test import (
     TestDebugRequest,
+    TestExtraEnv,
     TestRequest,
     TestResult,
     TestSubsystem,
@@ -73,6 +74,7 @@ async def setup_clojure_test_for_target(
     request: TestSetupRequest,
     jvm: JvmSubsystem,
     test_subsystem: TestSubsystem,
+    test_extra_env: TestExtraEnv,
 ) -> TestSetup:
     # Prepare JDK and get transitive targets
     jdk_request = JdkRequest.from_field(request.field_set.jdk_version)
@@ -124,10 +126,11 @@ async def setup_clojure_test_for_target(
         MergeDigests([*classpath.digests(), all_source_files.snapshot.digest]),
     )
 
-    # Get environment variables
+    # Get environment variables: merge [test].extra_env_vars with per-target extra_env_vars
     field_set_extra_env = await environment_vars_subset(
         EnvironmentVarsRequest(request.field_set.extra_env_vars.value or ()),
     )
+    extra_env = {**test_extra_env.env, **field_set_extra_env}
 
     # Output directory for test results (for future XML reports)
     reports_dir = f"__reports/{request.field_set.address.path_safe_spec}"
@@ -159,7 +162,7 @@ async def setup_clojure_test_for_target(
             test_runner_code,
         ],
         input_digest=input_digest,
-        extra_env=field_set_extra_env,
+        extra_env=extra_env,
         extra_jvm_options=(),
         extra_nailgun_keys=(),
         output_directories=(reports_dir,),
