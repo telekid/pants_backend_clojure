@@ -20,7 +20,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, AddressInput
 from pants.engine.fs import Digest, FileContent, PathGlobs
 from pants.engine.intrinsics import get_digest_contents, path_globs_to_digest
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
@@ -36,6 +36,8 @@ from pants.jvm.resolve.coursier_fetch import (
 )
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
+    JvmArtifactArtifactField,
+    JvmArtifactGroupField,
     JvmArtifactPackagesField,
     JvmResolveField,
 )
@@ -204,6 +206,7 @@ async def find_clojure_artifact_packages(
 async def build_third_party_clojure_namespace_mapping(
     request: ThirdPartyClojureNamespaceMappingRequest,
     jvm: JvmSubsystem,
+    all_jvm_artifact_tgts: AllJvmArtifactTargets,
 ) -> ThirdPartyClojureNamespaceMapping:
     """Build namespace mapping for a resolve by analyzing JARs from the lockfile.
 
@@ -211,7 +214,7 @@ async def build_third_party_clojure_namespace_mapping(
     1. Loads the lockfile for the specified resolve
     2. Fetches all JARs (using Coursier cache)
     3. Analyzes each JAR for Clojure namespaces
-    4. Returns a mapping from namespace to jvm_artifact addresses
+    4. Maps discovered namespaces back to jvm_artifact targets by matching coordinates
     """
     # Get lockfile path for this resolve
     lockfile_path = jvm.resolves.get(request.resolve_name)
@@ -240,18 +243,29 @@ async def build_third_party_clojure_namespace_mapping(
     if not lockfile.entries:
         return ThirdPartyClojureNamespaceMapping(FrozenDict())
 
+    # Build (group, artifact) -> Address lookup from declared jvm_artifact targets.
+    # Lockfile entries don't carry pants_address for Coursier-resolved artifacts,
+    # so we match by Maven coordinates instead.
+    coord_to_address: dict[tuple[str, str], Address] = {}
+    for tgt in all_jvm_artifact_tgts:
+        resolve = tgt[JvmResolveField].normalized_value(jvm)
+        if resolve != request.resolve_name:
+            continue
+        group = tgt[JvmArtifactGroupField].value
+        artifact = tgt[JvmArtifactArtifactField].value
+        coord_to_address[(group, artifact)] = tgt.address
+
     # Fetch all JARs using Coursier (uses cache)
     classpath_entries = await concurrently(coursier_fetch_one_coord(entry, **implicitly()) for entry in lockfile.entries)
 
     # Analyze each JAR for Clojure namespaces
     mapping: dict[str, list[Address]] = {}
-
     for entry, classpath_entry in zip(lockfile.entries, classpath_entries):
-        # Skip entries without pants_address (shouldn't happen in practice)
-        if not entry.pants_address:
+        coord_key = (entry.coord.group, entry.coord.artifact)
+        address = coord_to_address.get(coord_key)
+        if not address:
+            # Transitive dep not declared as a jvm_artifact — skip
             continue
-
-        address = Address.parse(entry.pants_address)
 
         # Materialize JAR to analyze it
         try:
@@ -260,7 +274,6 @@ async def build_third_party_clojure_namespace_mapping(
                 continue
 
             # Write to temp file and analyze
-            # TODO: Consider making analyze_jar_for_namespaces accept bytes directly
             with tempfile.NamedTemporaryFile(suffix=".jar", delete=False) as tmp_jar:
                 tmp_jar.write(jar_contents[0].content)
                 tmp_jar.flush()
@@ -268,7 +281,6 @@ async def build_third_party_clojure_namespace_mapping(
 
                 try:
                     analysis = analyze_jar_for_namespaces(jar_path)
-
                     for namespace in analysis.namespaces:
                         if namespace not in mapping:
                             mapping[namespace] = []
@@ -465,7 +477,9 @@ async def _load_legacy_metadata_files() -> dict[tuple[str, str], tuple[Address, 
             metadata = _parse_metadata_file(file_content)
 
             for coord, artifact_meta in metadata.artifacts.items():
-                address = Address.parse(artifact_meta.address)
+                address = AddressInput.parse(
+                    artifact_meta.address, description_of_origin="Clojure namespace metadata"
+                ).dir_to_address()
 
                 for namespace in artifact_meta.namespaces:
                     key = (namespace, metadata.resolve)
