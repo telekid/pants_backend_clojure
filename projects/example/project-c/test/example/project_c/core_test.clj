@@ -8,3 +8,6 @@
 
 (deftest test-project-a-value
   (is (= "example common value" thing)))
+
+(deftest test-thing-as-json
+  (is (= "{\"value\":\"example common value\"}" (core/thing-as-json))))
