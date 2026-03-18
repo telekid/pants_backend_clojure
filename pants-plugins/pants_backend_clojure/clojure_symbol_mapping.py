@@ -246,7 +246,10 @@ async def build_third_party_clojure_namespace_mapping(
     # Build (group, artifact) -> Address lookup from declared jvm_artifact targets.
     # Lockfile entries don't carry pants_address for Coursier-resolved artifacts,
     # so we match by Maven coordinates instead.
+    # Also track which artifacts have explicit `packages` fields — those should be
+    # skipped during JAR analysis since the user has declared exactly what they own.
     coord_to_address: dict[tuple[str, str], Address] = {}
+    coords_with_explicit_packages: set[tuple[str, str]] = set()
     for tgt in all_jvm_artifact_tgts:
         resolve = tgt[JvmResolveField].normalized_value(jvm)
         if resolve != request.resolve_name:
@@ -254,6 +257,8 @@ async def build_third_party_clojure_namespace_mapping(
         group = tgt[JvmArtifactGroupField].value
         artifact = tgt[JvmArtifactArtifactField].value
         coord_to_address[(group, artifact)] = tgt.address
+        if tgt[JvmArtifactPackagesField].value:
+            coords_with_explicit_packages.add((group, artifact))
 
     # Fetch all JARs using Coursier (uses cache)
     classpath_entries = await concurrently(coursier_fetch_one_coord(entry, **implicitly()) for entry in lockfile.entries)
@@ -265,6 +270,9 @@ async def build_third_party_clojure_namespace_mapping(
         address = coord_to_address.get(coord_key)
         if not address:
             # Transitive dep not declared as a jvm_artifact — skip
+            continue
+        if coord_key in coords_with_explicit_packages:
+            # User declared explicit packages — skip JAR analysis, use those instead
             continue
 
         # Materialize JAR to analyze it
