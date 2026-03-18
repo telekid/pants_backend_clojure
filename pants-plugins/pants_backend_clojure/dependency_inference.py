@@ -320,10 +320,61 @@ async def infer_clojure_runtime_dependency(
     return InferredDependencies(clojure_runtime.addresses)
 
 
+@dataclass(frozen=True)
+class ClojureResourceDependencyInferenceFieldSet(FieldSet):
+    """FieldSet for inferring sibling resources dependency."""
+
+    required_fields = (ClojureSourceField, JvmDependenciesField)
+
+    address: Address
+    dependencies: JvmDependenciesField
+
+
+class InferClojureResourceDependencyRequest(InferDependenciesRequest):
+    """Infer dependency on sibling resources directory.
+
+    In Polylith-style layouts, each brick has src/, test/, and resources/
+    directories. The resources/ directory should always be on the classpath
+    alongside source code — this mirrors deps.edn's {:paths ["src" "resources"]}.
+    """
+
+    infer_from = ClojureResourceDependencyInferenceFieldSet
+
+
+@rule(desc="Infer dependency on sibling resources for Clojure targets.")
+async def infer_clojure_resource_dependency(
+    request: InferClojureResourceDependencyRequest,
+) -> InferredDependencies:
+    """If a clojure_sources target is at .../src, look for targets in .../resources.
+
+    In Polylith-style layouts, each brick has src/, test/, and resources/
+    directories. This mirrors deps.edn's {:paths ["src" "resources"]}.
+    """
+    src_path = request.field_set.address.spec_path
+    if not src_path:
+        return InferredDependencies([])
+
+    # Compute sibling resources path: .../src -> .../resources
+    parts = src_path.rsplit("/", 1)
+    if not (len(parts) == 2 and parts[1] in ("src", "test")):
+        return InferredDependencies([])
+
+    # Look for a `resources` target in the sibling directory.
+    # Convention: the target is named "resources" in the BUILD file.
+    resources_address = Address(f"{parts[0]}/resources", target_name="resources")
+    try:
+        # Validate the target exists by resolving it
+        await resolve_targets(**implicitly({Addresses([resources_address]): Addresses}))
+        return InferredDependencies([resources_address])
+    except Exception:
+        return InferredDependencies([])
+
+
 def rules():
     return [
         *collect_rules(),
         UnionRule(InferDependenciesRequest, InferClojureSourceDependencies),
         UnionRule(InferDependenciesRequest, InferClojureTestDependencies),
         UnionRule(InferDependenciesRequest, InferClojureRuntimeDependencyRequest),
+        UnionRule(InferDependenciesRequest, InferClojureResourceDependencyRequest),
     ]

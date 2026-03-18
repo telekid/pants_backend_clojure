@@ -11,7 +11,9 @@ import os
 from textwrap import dedent
 
 import pytest
+from pants.core.goals.package import rules as package_rules
 from pants.core.goals.test import TestResult
+from pants.core.goals.test import rules as test_goal_rules
 from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import QueryRule
@@ -27,12 +29,15 @@ from pants.jvm.goals import lockfile
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
+from pants.core.target_types import ResourcesGeneratorTarget, ResourceTarget
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as jvm_util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 from pants_backend_clojure import compile_clj
 from pants_backend_clojure.clojure_symbol_mapping import rules as clojure_symbol_mapping_rules
+from pants.engine.target import Target
 from pants_backend_clojure.dependency_inference import (
+    InferClojureResourceDependencyRequest,
     InferClojureSourceDependencies,
     InferClojureTestDependencies,
 )
@@ -74,6 +79,8 @@ def rule_runner() -> RuleRunner:
             *namespace_analysis_rules(),
             *target_types_rules(),
             *test_runner_rules(),
+            *test_goal_rules(),
+            *package_rules(),
             *source_files.rules(),
             *stripped_source_files.rules(),
             *system_binaries.rules(),
@@ -86,6 +93,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ExplicitlyProvidedDependencies, [DependenciesRequest]),
             QueryRule(InferredDependencies, [InferClojureSourceDependencies]),
             QueryRule(InferredDependencies, [InferClojureTestDependencies]),
+            QueryRule(InferredDependencies, [InferClojureResourceDependencyRequest]),
             QueryRule(TestResult, [ClojureTestRequest.Batch]),
         ],
         target_types=[
@@ -94,6 +102,8 @@ def rule_runner() -> RuleRunner:
             ClojureTestTarget,
             ClojureTestsGeneratorTarget,
             JvmArtifactTarget,
+            ResourcesGeneratorTarget,
+            ResourceTarget,
         ],
     )
     rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
@@ -234,3 +244,202 @@ def test_infer_clojure_test_dependency(rule_runner: RuleRunner) -> None:
     assert inferred == InferredDependencies([calculator_target.address]), (
         f"Expected {calculator_target.address} to be inferred, but got {inferred}"
     )
+
+
+# ===== Sibling resources inference tests =====
+
+
+@maybe_skip_jdk_test
+def test_infer_sibling_resources_from_src(rule_runner: RuleRunner) -> None:
+    """Test that clojure_sources in src/ auto-depends on sibling resources/."""
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name="org.clojure_clojure",
+                    group="org.clojure",
+                    artifact="clojure",
+                    version="1.12.3",
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": "# Empty lockfile for testing\n",
+            "mylib/src/BUILD": dedent(
+                """\
+                clojure_source(
+                    name='lib',
+                    source='my/core.clj',
+                )
+                """
+            ),
+            "mylib/src/my/core.clj": "(ns my.core)\n",
+            "mylib/resources/BUILD": dedent(
+                """\
+                resources(
+                    name='resources',
+                    sources=['**/*'],
+                )
+                """
+            ),
+            "mylib/resources/config.edn": "{:key \"value\"}\n",
+        }
+    )
+
+    source_target = rule_runner.get_target(
+        Address("mylib/src", target_name="lib", relative_file_path="my/core.clj")
+    )
+
+    from pants_backend_clojure.dependency_inference import ClojureResourceDependencyInferenceFieldSet
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferClojureResourceDependencyRequest(ClojureResourceDependencyInferenceFieldSet.create(source_target))],
+    )
+
+    # Should find the resources target
+    assert Address("mylib/resources", target_name="resources") in inferred.include
+
+
+@maybe_skip_jdk_test
+def test_infer_sibling_resources_from_test(rule_runner: RuleRunner) -> None:
+    """Test that clojure_test in test/ auto-depends on sibling resources/."""
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name="org.clojure_clojure",
+                    group="org.clojure",
+                    artifact="clojure",
+                    version="1.12.3",
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": "# Empty lockfile for testing\n",
+            "mylib/test/BUILD": dedent(
+                """\
+                clojure_test(
+                    name='tests',
+                    source='my/core_test.clj',
+                )
+                """
+            ),
+            "mylib/test/my/core_test.clj": dedent(
+                """\
+                (ns my.core-test
+                  (:require [clojure.test :refer [deftest is]]))
+                (deftest dummy (is true))
+                """
+            ),
+            "mylib/resources/BUILD": dedent(
+                """\
+                resources(
+                    name='resources',
+                    sources=['**/*'],
+                )
+                """
+            ),
+            "mylib/resources/test-data.edn": "{}\n",
+        }
+    )
+
+    test_target = rule_runner.get_target(
+        Address("mylib/test", target_name="tests", relative_file_path="my/core_test.clj")
+    )
+
+    from pants_backend_clojure.dependency_inference import ClojureResourceDependencyInferenceFieldSet
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferClojureResourceDependencyRequest(ClojureResourceDependencyInferenceFieldSet.create(test_target))],
+    )
+
+    assert Address("mylib/resources", target_name="resources") in inferred.include
+
+
+@maybe_skip_jdk_test
+def test_no_sibling_resources_no_error(rule_runner: RuleRunner) -> None:
+    """Test that missing sibling resources/ directory doesn't cause errors."""
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name="org.clojure_clojure",
+                    group="org.clojure",
+                    artifact="clojure",
+                    version="1.12.3",
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": "# Empty lockfile for testing\n",
+            "mylib/src/BUILD": dedent(
+                """\
+                clojure_source(
+                    name='lib',
+                    source='my/core.clj',
+                )
+                """
+            ),
+            "mylib/src/my/core.clj": "(ns my.core)\n",
+            # No resources/ directory at all
+        }
+    )
+
+    source_target = rule_runner.get_target(
+        Address("mylib/src", target_name="lib", relative_file_path="my/core.clj")
+    )
+
+    from pants_backend_clojure.dependency_inference import ClojureResourceDependencyInferenceFieldSet
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferClojureResourceDependencyRequest(ClojureResourceDependencyInferenceFieldSet.create(source_target))],
+    )
+
+    # Should return empty, not error
+    assert inferred == InferredDependencies([])
+
+
+@maybe_skip_jdk_test
+def test_no_resources_inference_for_non_brick_paths(rule_runner: RuleRunner) -> None:
+    """Test that resources inference only triggers for src/ and test/ directories."""
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name="org.clojure_clojure",
+                    group="org.clojure",
+                    artifact="clojure",
+                    version="1.12.3",
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": "# Empty lockfile for testing\n",
+            "BUILD": dedent(
+                """\
+                clojure_source(
+                    name='lib',
+                    source='core.clj',
+                )
+                """
+            ),
+            "core.clj": "(ns core)\n",
+        }
+    )
+
+    source_target = rule_runner.get_target(
+        Address("", target_name="lib", relative_file_path="core.clj")
+    )
+
+    from pants_backend_clojure.dependency_inference import ClojureResourceDependencyInferenceFieldSet
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferClojureResourceDependencyRequest(ClojureResourceDependencyInferenceFieldSet.create(source_target))],
+    )
+
+    # Root-level target has no parent/src path, so no inference
+    assert inferred == InferredDependencies([])
