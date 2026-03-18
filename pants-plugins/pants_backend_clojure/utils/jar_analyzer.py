@@ -132,28 +132,24 @@ def analyze_jar_for_namespaces(jar_path: Path) -> JarNamespaceAnalysis:
 
     try:
         with zipfile.ZipFile(jar_path, "r") as jar:
-            # First pass: Look for Clojure source files
-            source_files = [
-                name for name in jar.namelist() if name.endswith((".clj", ".cljc", ".clje")) and not name.startswith("META-INF/")
-            ]
+            entries = jar.namelist()
 
-            if source_files:
-                # We have source files - parse them for namespace declarations
-                for entry in source_files:
+            # Analyze Clojure source files (.clj, .cljc, .clje)
+            for entry in entries:
+                if entry.endswith((".clj", ".cljc", ".clje")) and not entry.startswith("META-INF/"):
                     try:
                         content = jar.read(entry).decode("utf-8", errors="ignore")
                         ns = _parse_namespace_simple(content)
                         if ns:
                             namespaces.add(ns)
                     except Exception:
-                        # If we can't parse this file, skip it
-                        # Common reasons: corrupt files, non-UTF8 encoding, etc.
                         pass
-            else:
-                # No source files - fall back to analyzing class files
-                class_files = [name for name in jar.namelist() if name.endswith(".class") and not name.startswith("META-INF/")]
 
-                for entry in class_files:
+            # Also analyze AOT-compiled __init.class files.
+            # Some JARs (e.g., Rama) contain both .clj sources and AOT classes,
+            # but the AOT classes may define namespaces not present in the sources.
+            for entry in entries:
+                if entry.endswith(".class") and not entry.startswith("META-INF/"):
                     ns = namespace_from_class_path(entry)
                     if ns:
                         namespaces.add(ns)
