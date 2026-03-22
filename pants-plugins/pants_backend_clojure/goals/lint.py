@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFilesRequest, find_config_file
 from pants.core.util_rules.external_tool import (
@@ -16,13 +17,16 @@ from pants.core.util_rules.partitions import (
     Partitions,
 )
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
-from pants.engine.addresses import Addresses
-from pants.engine.fs import MergeDigests
-from pants.engine.intrinsics import execute_process, merge_digests
+from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, PathGlobs
+from pants.engine.intrinsics import execute_process, merge_digests, path_globs_to_digest
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.jvm.classpath import classpath as classpath_get
+from pants.jvm.resolve.coursier_fetch import (
+    coursier_fetch_lockfile,
+    get_coursier_lockfile_for_resolve,
+)
+from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -42,6 +46,7 @@ class CljKondoPartitionMetadata:
     """Metadata for a clj-kondo partition."""
 
     resolve: str
+    classpath_digest: Digest
 
     @property
     def description(self) -> str:
@@ -52,27 +57,56 @@ class CljKondoPartitionMetadata:
 async def partition_clj_kondo_by_resolve(
     request: CljKondoRequest.PartitionRequest,
     jvm: JvmSubsystem,
+    clj_kondo: CljKondo,
 ) -> Partitions:
     """Partition clj-kondo lint targets by JVM resolve.
 
-    Each resolve has its own classpath, so we must lint them separately
-    to avoid mixing dependencies from different resolves.
+    Each resolve has its own set of third-party dependencies, so we must lint
+    them separately. The classpath (third-party JARs only) is resolved once per
+    partition here, rather than per-batch, to avoid redundant work and enable
+    parallelism when --lint-batch-size is lowered.
     """
     # Group field sets by resolve
     resolves_to_field_sets: dict[str, list[CljKondoFieldSet]] = defaultdict(list)
 
     for field_set in request.field_sets:
-        # Get the resolve from the field set
         resolve = field_set.resolve.normalized_value(jvm)
         resolves_to_field_sets[resolve].append(field_set)
 
-    # Create one partition per resolve
+    # Create one partition per resolve, pre-resolving third-party JARs if needed
     partitions = []
     for resolve, field_sets in sorted(resolves_to_field_sets.items()):
+        classpath_digest = EMPTY_DIGEST
+
+        if clj_kondo.use_classpath:
+            # Construct CoursierResolveKey directly from the resolve name,
+            # avoiding CoarsenedTargets which would trigger first-party compilation.
+            # This mirrors select_coursier_resolve_for_targets (coursier_fetch.py:722-731).
+            resolve_path = jvm.resolves[resolve]
+            lockfile_source = PathGlobs(
+                [resolve_path],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"The resolve `{resolve}` from `[jvm].resolves`",
+            )
+            resolve_digest = await path_globs_to_digest(lockfile_source)
+            resolve_key = CoursierResolveKey(resolve, resolve_path, resolve_digest)
+
+            # Fetch all third-party JARs from the lockfile (no compilation triggered)
+            lockfile = await get_coursier_lockfile_for_resolve(resolve_key)
+            resolved_entries = await coursier_fetch_lockfile(lockfile)
+
+            # Merge all JAR digests into a single digest for the partition
+            classpath_digest = await merge_digests(
+                MergeDigests(entry.digest for entry in resolved_entries)
+            )
+
         partitions.append(
             Partition(
                 tuple(field_sets),
-                CljKondoPartitionMetadata(resolve=resolve),
+                CljKondoPartitionMetadata(
+                    resolve=resolve,
+                    classpath_digest=classpath_digest,
+                ),
             )
         )
 
@@ -88,8 +122,8 @@ async def clj_kondo_lint(
     """Lint Clojure source files using clj-kondo.
 
     This rule downloads the clj-kondo native binary, finds any config files,
-    and runs `clj-kondo --lint` on the source files. If classpath support is
-    enabled, it also resolves and includes all transitive dependencies.
+    and runs `clj-kondo --lint` on the source files. Third-party dependency JARs
+    for symbol resolution are pre-resolved at the partition level.
     """
     # Step 1: Download clj-kondo binary
     downloaded_clj_kondo = await download_external_tool(clj_kondo.get_request(platform))
@@ -107,22 +141,14 @@ async def clj_kondo_lint(
         SourceFilesRequest(element.sources for element in request.elements),
     )
 
-    # Step 4: Get classpath if enabled
+    # Step 4: Use pre-resolved classpath from partition metadata
+    # Third-party JARs are resolved once per resolve in the partitioner,
+    # avoiding redundant work across batches and skipping first-party compilation.
     classpath_digests = []
+    if clj_kondo.use_classpath and request.partition_metadata:
+        classpath_digests = [request.partition_metadata.classpath_digest]
 
-    if clj_kondo.use_classpath and request.elements:
-        # Collect all addresses in this batch
-        addresses = Addresses(element.address for element in request.elements)
-
-        # Get classpath for these targets (automatically includes transitive dependencies)
-        classpath = await classpath_get(**implicitly({addresses: Addresses}))
-
-        # Include classpath JARs in the input digest so clj-kondo can use them for
-        # symbol resolution via its cache, but don't pass them to --lint since we
-        # only want to lint first-party sources
-        classpath_digests = list(classpath.digests())
-
-    # Step 5: Merge all inputs (includes classpath digests)
+    # Step 5: Merge all inputs
     input_digest = await merge_digests(
         MergeDigests(
             [

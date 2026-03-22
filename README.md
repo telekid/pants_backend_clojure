@@ -65,7 +65,7 @@ Add the plugin to your `pants.toml`:
 ```toml
 [GLOBAL]
 pants_version = "2.31.0"
-plugins = ["pants-backend-clojure==0.1.2"]
+plugins = ["pants-backend-clojure==0.1.3"]
 backend_packages = [
     "pants.backend.experimental.java",
     "pants_backend_clojure",
@@ -304,6 +304,53 @@ known_versions = [
 ```
 
 This should be resolved once Coursier releases a stable v2.1.25+.
+
+## Local Development
+
+If you want to test changes to this plugin in another Pants project before publishing, there are two approaches.
+
+### Quick iteration: `pythonpath`
+
+Load the plugin directly from source with no build step. In the consuming project's `pants.toml`:
+
+```toml
+[GLOBAL]
+pythonpath = ["/path/to/pants-backend-clojure/pants-plugins"]
+backend_packages = [
+    "pants.backend.experimental.java",
+    "pants_backend_clojure",
+]
+```
+
+Changes are picked up immediately — no rebuild needed. Note that this does not test packaging or dependency metadata.
+
+### Full validation: local wheel
+
+Build the wheel and point the consuming project at it. This tests the actual distributed package.
+
+```bash
+# In this repo
+pants package pants-plugins:wheel
+```
+
+Then in the consuming project's `pants.toml`:
+
+```toml
+[GLOBAL]
+plugins = ["pants-backend-clojure==0.1.3"]
+backend_packages = [
+    "pants.backend.experimental.java",
+    "pants_backend_clojure",
+]
+plugins_force_resolve = true  # re-resolves on every run; remove when done
+
+[python-repos]
+find_links = [
+    "file:///path/to/pants-backend-clojure/dist",
+]
+```
+
+Rebuild the wheel after each change and Pants will pick it up automatically.
 
 ## Contributing
 
