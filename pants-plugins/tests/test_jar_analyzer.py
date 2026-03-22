@@ -214,21 +214,41 @@ def test_analyze_jar_with_aot_hyphenated_namespaces():
         jar_path.unlink()
 
 
-def test_analyze_jar_prefers_source_over_classes():
-    """Test that source files are preferred over class files."""
+def test_analyze_jar_combines_source_and_classes():
+    """Test that both source files and __init.class files are analyzed."""
     jar_path = create_test_jar(
         {
-            # Source file with actual namespace
+            # Source file with namespace
             "clojure/data/json.clj": "(ns clojure.data.json)",
-            # Class files that might suggest different namespaces
+            # AOT-compiled namespace not present as source (e.g., Rama pattern)
+            "com/rpl/rama__init.class": b"fake init class",
+            # Regular class file — should be ignored (no __init suffix)
             "clojure/data/xml.class": b"fake class",
         }
     )
 
     try:
         result = analyze_jar_for_namespaces(jar_path)
-        # Should use source file parsing, not class file inference
-        # Note: xml.class won't be analyzed because source files were found
+        # Should find both: source-based and __init.class-based namespaces
+        assert result.namespaces == ("clojure.data.json", "com.rpl.rama")
+    finally:
+        jar_path.unlink()
+
+
+def test_analyze_jar_deduplicates_source_and_class():
+    """Test that a namespace found in both source and __init.class is deduplicated."""
+    jar_path = create_test_jar(
+        {
+            # Same namespace in both source and AOT form
+            "clojure/data/json.clj": "(ns clojure.data.json)",
+            "clojure/data/json__init.class": b"fake init class",
+            "clojure/data/json$read_str.class": b"fake function class",
+        }
+    )
+
+    try:
+        result = analyze_jar_for_namespaces(jar_path)
+        # Should appear only once
         assert result.namespaces == ("clojure.data.json",)
     finally:
         jar_path.unlink()
@@ -428,5 +448,38 @@ def test_analyze_realistic_multi_namespace_jar():
             "clojure.core.async.impl.dispatch",
             "clojure.core.async.impl.protocols",
         )
+    finally:
+        jar_path.unlink()
+
+
+def test_analyze_mixed_jar_aot_namespaces_not_in_source():
+    """Test analyzing a JAR where some namespaces exist only as AOT classes.
+
+    This simulates JARs like Rama where the JAR contains some .clj helper
+    files but the primary namespaces (com.rpl.rama, com.rpl.rama.path) are
+    only available as AOT-compiled __init.class files. Before the fix,
+    the presence of any .clj file would cause __init.class analysis to be
+    skipped entirely, making these namespaces invisible to inference.
+    """
+    jar_path = create_test_jar(
+        {
+            # A helper .clj source file
+            "com/rpl/rama/helpers.clj": "(ns com.rpl.rama-helpers)",
+            # Primary namespaces only as AOT classes
+            "com/rpl/rama__init.class": b"fake init class",
+            "com/rpl/rama$module__init.class": b"fake class",
+            "com/rpl/rama/path__init.class": b"fake init class",
+            # Function classes — should be ignored
+            "com/rpl/rama$defmodule.class": b"fake fn class",
+            "com/rpl/rama$fn__12345.class": b"fake fn class",
+        }
+    )
+
+    try:
+        result = analyze_jar_for_namespaces(jar_path)
+        # Must find ALL namespaces: source-based AND AOT-based
+        assert "com.rpl.rama-helpers" in result.namespaces  # from .clj
+        assert "com.rpl.rama" in result.namespaces  # from __init.class
+        assert "com.rpl.rama.path" in result.namespaces  # from __init.class
     finally:
         jar_path.unlink()

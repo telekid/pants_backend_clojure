@@ -6,6 +6,7 @@
 # {
 #   "version": 1,
 #   "generated_with_requirements": [
+#     "cheshire:cheshire:5.13.0,url=not_provided,jar=not_provided",
 #     "com.google.guava:guava:31.1-jre,url=not_provided,jar=not_provided",
 #     "junit:junit:4.13.2,url=not_provided,jar=not_provided",
 #     "org.clojure:clojure:1.12.3,url=not_provided,jar=not_provided"
@@ -13,6 +14,124 @@
 # }
 # --- END PANTS LOCKFILE METADATA ---
 
+[[entries]]
+file_name = "cheshire_cheshire_5.13.0.jar"
+[[entries.directDependencies]]
+group = "com.fasterxml.jackson.core"
+artifact = "jackson-core"
+version = "2.17.0"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.fasterxml.jackson.dataformat"
+artifact = "jackson-dataformat-cbor"
+version = "2.17.0"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "com.fasterxml.jackson.dataformat"
+artifact = "jackson-dataformat-smile"
+version = "2.17.0"
+packaging = "jar"
+
+[[entries.directDependencies]]
+group = "tigris"
+artifact = "tigris"
+version = "0.1.2"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.fasterxml.jackson.core"
+artifact = "jackson-core"
+version = "2.17.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.fasterxml.jackson.dataformat"
+artifact = "jackson-dataformat-cbor"
+version = "2.17.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.fasterxml.jackson.dataformat"
+artifact = "jackson-dataformat-smile"
+version = "2.17.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "tigris"
+artifact = "tigris"
+version = "0.1.2"
+packaging = "jar"
+
+
+[entries.coord]
+group = "cheshire"
+artifact = "cheshire"
+version = "5.13.0"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "c009610160ca8a1d8a6dad5307d06d171d318cd426ec249990c17fe8e0b89aec"
+serialized_bytes_length = 25054
+[[entries]]
+directDependencies = []
+dependencies = []
+file_name = "com.fasterxml.jackson.core_jackson-core_2.17.0.jar"
+
+[entries.coord]
+group = "com.fasterxml.jackson.core"
+artifact = "jackson-core"
+version = "2.17.0"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "55be130f6a68038088a261856c4e383ce79957a0fc1a29ecb213a9efd6ef4389"
+serialized_bytes_length = 581556
+[[entries]]
+file_name = "com.fasterxml.jackson.dataformat_jackson-dataformat-cbor_2.17.0.jar"
+[[entries.directDependencies]]
+group = "com.fasterxml.jackson.core"
+artifact = "jackson-core"
+version = "2.17.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.fasterxml.jackson.core"
+artifact = "jackson-core"
+version = "2.17.0"
+packaging = "jar"
+
+
+[entries.coord]
+group = "com.fasterxml.jackson.dataformat"
+artifact = "jackson-dataformat-cbor"
+version = "2.17.0"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "d7050cb5e622848d5be382848b1792e8244d529e24c84ba1cc27aabf2496fe3b"
+serialized_bytes_length = 70363
+[[entries]]
+file_name = "com.fasterxml.jackson.dataformat_jackson-dataformat-smile_2.17.0.jar"
+[[entries.directDependencies]]
+group = "com.fasterxml.jackson.core"
+artifact = "jackson-core"
+version = "2.17.0"
+packaging = "jar"
+
+[[entries.dependencies]]
+group = "com.fasterxml.jackson.core"
+artifact = "jackson-core"
+version = "2.17.0"
+packaging = "jar"
+
+
+[entries.coord]
+group = "com.fasterxml.jackson.dataformat"
+artifact = "jackson-dataformat-smile"
+version = "2.17.0"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "e6b2bf2a53d1f88ec02f1833da24c208aa299876e47d37f7920b1e83e214baab"
+serialized_bytes_length = 96601
 [[entries]]
 directDependencies = []
 dependencies = []
@@ -303,3 +422,16 @@ packaging = "jar"
 [entries.file_digest]
 fingerprint = "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9"
 serialized_bytes_length = 45024
+[[entries]]
+directDependencies = []
+dependencies = []
+file_name = "tigris_tigris_0.1.2.jar"
+
+[entries.coord]
+group = "tigris"
+artifact = "tigris"
+version = "0.1.2"
+packaging = "jar"
+[entries.file_digest]
+fingerprint = "49aa648edb6c14e57095a11b391eaee606578323fb79755f92331ac6300f97a0"
+serialized_bytes_length = 10550
