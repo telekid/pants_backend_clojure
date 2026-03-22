@@ -6,7 +6,9 @@ from textwrap import dedent
 
 import pytest
 from pants.core.goals.check import CheckResults
+from pants.core.goals.package import rules as package_rules
 from pants.core.goals.test import TestResult
+from pants.core.goals.test import rules as test_goal_rules
 from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Address
 from pants.jvm import classpath, jvm_common, non_jvm_dependencies
@@ -52,6 +54,8 @@ def rule_runner() -> RuleRunner:
             *target_types_rules(),
             *check_goal.rules(),
             *test_runner_rules(),
+            *test_goal_rules(),
+            *package_rules(),
             *lockfile.rules(),
             QueryRule(CheckResults, [ClojureCheckRequest]),
             QueryRule(TestResult, [ClojureTestRequest.Batch]),
