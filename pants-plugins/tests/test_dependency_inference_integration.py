@@ -14,6 +14,7 @@ import pytest
 from pants.core.goals.package import rules as package_rules
 from pants.core.goals.test import TestResult
 from pants.core.goals.test import rules as test_goal_rules
+from pants.core.target_types import ResourcesGeneratorTarget, ResourceTarget
 from pants.core.util_rules import config_files, external_tool, source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import QueryRule
@@ -29,13 +30,11 @@ from pants.jvm.goals import lockfile
 from pants.jvm.resolve import jvm_tool
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
-from pants.core.target_types import ResourcesGeneratorTarget, ResourceTarget
 from pants.jvm.target_types import JvmArtifactTarget
 from pants.jvm.util_rules import rules as jvm_util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 from pants_backend_clojure import compile_clj
 from pants_backend_clojure.clojure_symbol_mapping import rules as clojure_symbol_mapping_rules
-from pants.engine.target import Target
 from pants_backend_clojure.dependency_inference import (
     InferClojureResourceDependencyRequest,
     InferClojureSourceDependencies,
@@ -282,13 +281,11 @@ def test_infer_sibling_resources_from_src(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "mylib/resources/config.edn": "{:key \"value\"}\n",
+            "mylib/resources/config.edn": '{:key "value"}\n',
         }
     )
 
-    source_target = rule_runner.get_target(
-        Address("mylib/src", target_name="lib", relative_file_path="my/core.clj")
-    )
+    source_target = rule_runner.get_target(Address("mylib/src", target_name="lib", relative_file_path="my/core.clj"))
 
     from pants_backend_clojure.dependency_inference import ClojureResourceDependencyInferenceFieldSet
 
@@ -344,9 +341,7 @@ def test_infer_sibling_resources_from_test(rule_runner: RuleRunner) -> None:
         }
     )
 
-    test_target = rule_runner.get_target(
-        Address("mylib/test", target_name="tests", relative_file_path="my/core_test.clj")
-    )
+    test_target = rule_runner.get_target(Address("mylib/test", target_name="tests", relative_file_path="my/core_test.clj"))
 
     from pants_backend_clojure.dependency_inference import ClojureResourceDependencyInferenceFieldSet
 
@@ -387,9 +382,7 @@ def test_no_sibling_resources_no_error(rule_runner: RuleRunner) -> None:
         }
     )
 
-    source_target = rule_runner.get_target(
-        Address("mylib/src", target_name="lib", relative_file_path="my/core.clj")
-    )
+    source_target = rule_runner.get_target(Address("mylib/src", target_name="lib", relative_file_path="my/core.clj"))
 
     from pants_backend_clojure.dependency_inference import ClojureResourceDependencyInferenceFieldSet
 
@@ -430,9 +423,7 @@ def test_no_resources_inference_for_non_brick_paths(rule_runner: RuleRunner) -> 
         }
     )
 
-    source_target = rule_runner.get_target(
-        Address("", target_name="lib", relative_file_path="core.clj")
-    )
+    source_target = rule_runner.get_target(Address("", target_name="lib", relative_file_path="core.clj"))
 
     from pants_backend_clojure.dependency_inference import ClojureResourceDependencyInferenceFieldSet
 

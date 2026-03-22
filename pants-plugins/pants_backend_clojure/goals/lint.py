@@ -96,9 +96,7 @@ async def partition_clj_kondo_by_resolve(
             resolved_entries = await coursier_fetch_lockfile(lockfile)
 
             # Merge all JAR digests into a single digest for the partition
-            classpath_digest = await merge_digests(
-                MergeDigests(entry.digest for entry in resolved_entries)
-            )
+            classpath_digest = await merge_digests(MergeDigests(entry.digest for entry in resolved_entries))
 
         partitions.append(
             Partition(

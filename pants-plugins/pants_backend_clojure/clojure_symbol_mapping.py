@@ -485,9 +485,7 @@ async def _load_legacy_metadata_files() -> dict[tuple[str, str], tuple[Address, 
             metadata = _parse_metadata_file(file_content)
 
             for coord, artifact_meta in metadata.artifacts.items():
-                address = AddressInput.parse(
-                    artifact_meta.address, description_of_origin="Clojure namespace metadata"
-                ).dir_to_address()
+                address = AddressInput.parse(artifact_meta.address, description_of_origin="Clojure namespace metadata").dir_to_address()
 
                 for namespace in artifact_meta.namespaces:
                     key = (namespace, metadata.resolve)
