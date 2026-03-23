@@ -7,6 +7,7 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.core.goals.package import rules as package_rules
 from pants.core.goals.test import TestResult
 from pants.core.goals.test import rules as test_goal_rules
+from pants.core.target_types import FileTarget, FilesGeneratorTarget
 from pants.core.util_rules import config_files, source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
@@ -27,6 +28,7 @@ from pants_backend_clojure.target_types import (
     ClojureTestTarget,
 )
 from pants_backend_clojure.target_types import rules as target_types_rules
+from tests.clojure_test_fixtures import CLOJURE_3RDPARTY_BUILD, CLOJURE_LOCKFILE
 
 
 @pytest.fixture
@@ -59,6 +61,8 @@ def rule_runner() -> RuleRunner:
             ClojureTestsGeneratorTarget,
             JvmArtifactTarget,
             JavaSourcesGeneratorTarget,
+            FileTarget,
+            FilesGeneratorTarget,
         ],
     )
     return rule_runner
@@ -1539,5 +1543,87 @@ def test_namespace_with_metadata_passes(rule_runner: RuleRunner) -> None:
     )
 
     result = run_clojure_test(rule_runner, "tests", "example_metadata_test.clj")
+
+    assert result.exit_code == 0
+
+
+def test_file_target_available_in_sandbox(rule_runner: RuleRunner) -> None:
+    """Test that a file() target dependency is available in the test sandbox."""
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": CLOJURE_3RDPARTY_BUILD,
+            "3rdparty/jvm/default.lock": CLOJURE_LOCKFILE,
+            "data/BUILD": dedent(
+                """\
+                file(name="test-data", source="test-data.txt")
+                """
+            ),
+            "data/test-data.txt": "hello world",
+            "BUILD": dedent(
+                """\
+                clojure_tests(
+                    name='tests',
+                    dependencies=[
+                        '3rdparty/jvm:org.clojure_clojure',
+                        'data:test-data',
+                    ],
+                )
+                """
+            ),
+            "file_test.clj": dedent(
+                """\
+                (ns file-test
+                  (:require [clojure.test :refer [deftest is]]))
+
+                (deftest read-file-test
+                  (is (= "hello world" (slurp "data/test-data.txt"))))
+                """
+            ),
+        }
+    )
+
+    result = run_clojure_test(rule_runner, "tests", "file_test.clj")
+
+    assert result.exit_code == 0
+
+
+def test_files_generator_available_in_sandbox(rule_runner: RuleRunner) -> None:
+    """Test that a files() generator target dependency is available in the test sandbox."""
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": CLOJURE_3RDPARTY_BUILD,
+            "3rdparty/jvm/default.lock": CLOJURE_LOCKFILE,
+            "data/BUILD": dedent(
+                """\
+                files(name="test-data", sources=["*.txt"])
+                """
+            ),
+            "data/file1.txt": "content one",
+            "data/file2.txt": "content two",
+            "BUILD": dedent(
+                """\
+                clojure_tests(
+                    name='tests',
+                    dependencies=[
+                        '3rdparty/jvm:org.clojure_clojure',
+                        'data:test-data',
+                    ],
+                )
+                """
+            ),
+            "files_test.clj": dedent(
+                """\
+                (ns files-test
+                  (:require [clojure.test :refer [deftest is]]))
+
+                (deftest read-files-test
+                  (is (= "content one" (slurp "data/file1.txt")))
+                  (is (= "content two" (slurp "data/file2.txt"))))
+                """
+            ),
+        }
+    )
+
+    result = run_clojure_test(rule_runner, "tests", "files_test.clj")
 
     assert result.exit_code == 0

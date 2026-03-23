@@ -11,6 +11,7 @@ from pants.core.goals.test import (
     TestResult,
     TestSubsystem,
 )
+from pants.core.target_types import FileSourceField
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Addresses
@@ -124,18 +125,30 @@ async def setup_clojure_test_for_target(
             f"  3. Verify namespace follows Clojure naming conventions\n"
         )
 
-    # Get all source files (both production and test code)
-    all_source_files = await determine_source_files(
-        SourceFilesRequest(
-            (tgt.get(SourcesField) for tgt in trans_targets.closure),
-            for_sources_types=(ClojureSourceField, ClojureTestSourceField),
-            enable_codegen=False,
+    # Get all source files (both production and test code) and file targets concurrently
+    all_source_files, file_sources = await concurrently(
+        determine_source_files(
+            SourceFilesRequest(
+                (tgt.get(SourcesField) for tgt in trans_targets.closure),
+                for_sources_types=(ClojureSourceField, ClojureTestSourceField),
+                enable_codegen=False,
+            ),
+        ),
+        # File targets (files(), relocated_files()) for filesystem access in tests.
+        # Uses .dependencies (not .closure) because the root target is a test target,
+        # not a file target, so it would be filtered out anyway.
+        determine_source_files(
+            SourceFilesRequest(
+                (tgt.get(SourcesField) for tgt in trans_targets.dependencies),
+                for_sources_types=(FileSourceField,),
+                enable_codegen=True,
+            ),
         ),
     )
 
-    # Merge classpath JARs with all source files
+    # Merge classpath JARs with all source files and file targets
     input_digest = await merge_digests(
-        MergeDigests([*classpath.digests(), all_source_files.snapshot.digest]),
+        MergeDigests([*classpath.digests(), all_source_files.snapshot.digest, file_sources.snapshot.digest]),
     )
 
     # Get environment variables: merge [test].extra_env_vars with per-target extra_env_vars
