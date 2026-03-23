@@ -7,7 +7,7 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.core.goals.package import rules as package_rules
 from pants.core.goals.test import TestResult
 from pants.core.goals.test import rules as test_goal_rules
-from pants.core.target_types import FileTarget, FilesGeneratorTarget
+from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.util_rules import config_files, source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
@@ -1625,5 +1625,41 @@ def test_files_generator_available_in_sandbox(rule_runner: RuleRunner) -> None:
     )
 
     result = run_clojure_test(rule_runner, "tests", "files_test.clj")
+
+    assert result.exit_code == 0
+
+
+def test_test_with_extra_jvm_options(rule_runner: RuleRunner) -> None:
+    """Test that JVM options set via --clojure-test-runner-args are passed to the test process."""
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": CLOJURE_3RDPARTY_BUILD,
+            "3rdparty/jvm/default.lock": CLOJURE_LOCKFILE,
+            "BUILD": dedent(
+                """\
+                clojure_tests(
+                    name='tests',
+                    dependencies=['3rdparty/jvm:org.clojure_clojure'],
+                )
+                """
+            ),
+            "jvm_opts_test.clj": dedent(
+                """\
+                (ns jvm-opts-test
+                  (:require [clojure.test :refer [deftest is]]))
+
+                (deftest jvm-option-test
+                  (is (= "hello" (System/getProperty "test.property"))))
+                """
+            ),
+        }
+    )
+
+    result = run_clojure_test(
+        rule_runner,
+        "tests",
+        "jvm_opts_test.clj",
+        extra_args=["--clojure-test-runner-args=['-Dtest.property=hello']"],
+    )
 
     assert result.exit_code == 0

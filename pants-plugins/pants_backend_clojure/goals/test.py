@@ -29,7 +29,7 @@ from pants.engine.target import SourcesField, TransitiveTargetsRequest
 from pants.jvm.classpath import classpath as classpath_get
 from pants.jvm.jdk_rules import JdkRequest, JvmProcess, jvm_process, prepare_jdk_environment
 from pants.jvm.subsystems import JvmSubsystem
-from pants.option.option_types import SkipOption
+from pants.option.option_types import ArgsListOption, SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
@@ -59,6 +59,7 @@ class ClojureTestSubsystem(Subsystem):
     help = "Clojure test runner (clojure.test)"
 
     skip = SkipOption("test")
+    args = ArgsListOption(example="-Djdk.attach.allowAttachSelf")
 
 
 # ClojureTestFieldSet is now defined in target_types.py to avoid circular dependencies
@@ -89,6 +90,7 @@ async def setup_clojure_test_for_target(
     jvm: JvmSubsystem,
     test_subsystem: TestSubsystem,
     test_extra_env: TestExtraEnv,
+    clojure_test: ClojureTestSubsystem,
 ) -> TestSetup:
     # Prepare JDK and get transitive targets
     jdk_request = JdkRequest.from_field(request.field_set.jdk_version)
@@ -188,7 +190,7 @@ async def setup_clojure_test_for_target(
         ],
         input_digest=input_digest,
         extra_env=extra_env,
-        extra_jvm_options=(),
+        extra_jvm_options=clojure_test.args,
         extra_nailgun_keys=(),
         output_directories=(reports_dir,),
         output_files=(),
