@@ -134,6 +134,16 @@ async def clj_kondo_lint(
         ),
     )
 
+    # Step 2b: Capture .clj-kondo/hooks/ directory for custom hook files.
+    # ConfigFilesRequest only captures individual files, not directories,
+    # so we need a separate PathGlobs to include hook files in the sandbox.
+    hooks_digest = await path_globs_to_digest(
+        PathGlobs(
+            [".clj-kondo/hooks/**"],
+            glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+        ),
+    )
+
     # Step 3: Get source files
     source_files = await determine_source_files(
         SourceFilesRequest(element.sources for element in request.elements),
@@ -153,6 +163,7 @@ async def clj_kondo_lint(
                 source_files.snapshot.digest,
                 downloaded_clj_kondo.digest,
                 config_files.snapshot.digest,
+                hooks_digest,
                 *classpath_digests,
             ]
         ),

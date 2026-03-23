@@ -38,6 +38,19 @@ from pants_backend_clojure.target_types import (
     ClojureTestSourceField,
 )
 
+_NS_REGEX = re.compile(r"\(ns\s+(?:\^\{[^}]*\}\s+|\^[^\s]+\s+)*([a-z0-9\-_.]+)")
+
+
+def extract_test_namespace(content: str) -> str | None:
+    """Extract the namespace name from a Clojure source file.
+
+    Handles metadata annotations between `ns` and the namespace name, e.g.:
+        (ns ^{:doc "Description"} my.namespace)
+        (ns ^:no-doc my.namespace)
+    """
+    match = _NS_REGEX.search(content)
+    return match.group(1) if match else None
+
 
 class ClojureTestSubsystem(Subsystem):
     options_scope = "clojure-test-runner"
@@ -96,8 +109,8 @@ async def setup_clojure_test_for_target(
     test_file_path = test_source_files.files[0]
     digest_contents = await get_digest_contents(test_source_files.snapshot.digest)
     content = digest_contents[0].content.decode("utf-8")
-    match = re.search(r"\(ns\s+([a-z0-9\-_.]+)", content, re.MULTILINE)
-    if not match:
+    test_namespace = extract_test_namespace(content)
+    if not test_namespace:
         raise ValueError(
             f"Could not find namespace declaration in {test_file_path}.\n\n"
             f"Common causes:\n"
@@ -110,7 +123,6 @@ async def setup_clojure_test_for_target(
             f"  2. Check for syntax errors: pants check {request.field_set.address}\n"
             f"  3. Verify namespace follows Clojure naming conventions\n"
         )
-    test_namespace = match.group(1)
 
     # Get all source files (both production and test code)
     all_source_files = await determine_source_files(
