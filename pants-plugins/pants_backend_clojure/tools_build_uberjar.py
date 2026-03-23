@@ -68,8 +68,9 @@ def generate_build_script(
         # This matches: api/interface.class, api/interface$fn.class, api/interface__init.class, etc.
         exclusion_patterns.append(f'"^{ns_path}.*\\\\.class"')
 
-    # Always exclude LICENSE files
+    # Always exclude LICENSE files and META-INF/license (avoids file/dir conflicts)
     exclusion_patterns.append('#"^LICENSE"')
+    exclusion_patterns.append('#"(?i)^META-INF/license"')
     exclusion_vec = " ".join(exclusion_patterns) if exclusion_patterns else '#"^LICENSE"'
 
     # Format JAR prefixes as a Clojure vector of strings
