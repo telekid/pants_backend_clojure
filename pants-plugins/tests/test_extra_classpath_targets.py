@@ -31,7 +31,7 @@ from pants.core.util_rules.system_binaries import BashBinary, TouchBinary, ZipBi
 from pants.engine.fs import CreateDigest, DigestContents, FileContent, MergeDigests
 from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.process import Process, execute_process_or_raise
-from pants.engine.rules import QueryRule, collect_rules, implicitly, rule
+from pants.engine.rules import QueryRule, implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -77,7 +77,6 @@ from pants_backend_clojure.tools_build_uberjar import (
     rules as tools_build_uberjar_rules,
 )
 from tests.clojure_test_fixtures import CLOJURE_3RDPARTY_BUILD, CLOJURE_LOCKFILE
-
 
 # ---------------------------------------------------------------------------
 # Mock custom ClasspathEntryRequest target (simulates tailwind_css, etc.)
@@ -129,13 +128,9 @@ async def compile_mock_asset(
     optional_prereq = [*((request.prerequisite,) if request.prerequisite else ())]
     fallibles = (
         await compile_classpath_entries(ClasspathEntryRequests(optional_prereq)),
-        await compile_classpath_entries(
-            **implicitly(ClasspathDependenciesRequest(request, ignore_generated=True))
-        ),
+        await compile_classpath_entries(**implicitly(ClasspathDependenciesRequest(request, ignore_generated=True))),
     )
-    dep_classpath = FallibleClasspathEntries(
-        itertools.chain(*fallibles)
-    ).if_all_succeeded()
+    dep_classpath = FallibleClasspathEntries(itertools.chain(*fallibles)).if_all_succeeded()
     if dep_classpath is None:
         return FallibleClasspathEntry(
             description=str(request.component),
@@ -148,14 +143,10 @@ async def compile_mock_asset(
     output_path = target[MockAssetOutputPathField].value
 
     # Create a simple output file (simulates CSS compilation etc.)
-    content_digest = await create_digest(
-        CreateDigest([FileContent(output_path, b"/* compiled asset */\n")])
-    )
+    content_digest = await create_digest(CreateDigest([FileContent(output_path, b"/* compiled asset */\n")]))
 
     # Package into JAR
-    output_filename = (
-        f"{request.component.representative.address.path_safe_spec}.asset.jar"
-    )
+    output_filename = f"{request.component.representative.address.path_safe_spec}.asset.jar"
     css_paths = {Path(output_path)}
     directories = {parent for path in css_paths for parent in path.parents}
     input_files = {str(p) for p in chain(css_paths, directories)}
@@ -191,15 +182,9 @@ async def compile_mock_asset(
     )
 
     cpe = ClasspathEntry(jar_result.output_digest, [output_filename], [])
-    merged_digest = await merge_digests(
-        MergeDigests(chain((cpe.digest,), (e.digest for e in dep_classpath)))
-    )
-    merged_cpe = ClasspathEntry.merge(
-        digest=merged_digest, entries=[cpe, *dep_classpath]
-    )
-    return FallibleClasspathEntry(
-        output_filename, CompileResult.SUCCEEDED, merged_cpe, 0
-    )
+    merged_digest = await merge_digests(MergeDigests(chain((cpe.digest,), (e.digest for e in dep_classpath))))
+    merged_cpe = ClasspathEntry.merge(digest=merged_digest, entries=[cpe, *dep_classpath])
+    return FallibleClasspathEntry(output_filename, CompileResult.SUCCEEDED, merged_cpe, 0)
 
 
 def mock_asset_rules():
@@ -342,8 +327,7 @@ def test_deploy_jar_includes_custom_classpath_entry_target(
         entries = set(jar.namelist())
 
     assert "app/style.css" in entries, (
-        f"Custom ClasspathEntryRequest target output 'app/style.css' not found in JAR. "
-        f"Entries: {sorted(entries)}"
+        f"Custom ClasspathEntryRequest target output 'app/style.css' not found in JAR. Entries: {sorted(entries)}"
     )
 
 

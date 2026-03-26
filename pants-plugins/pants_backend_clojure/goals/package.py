@@ -33,9 +33,7 @@ from pants.jvm.compile import (
     ClasspathEntry,
     ClasspathEntryRequest,
     ClasspathEntryRequestFactory,
-    ClasspathEntryRequests,
     CompileResult,
-    FallibleClasspathEntries,
     FallibleClasspathEntry,
     compile_classpath_entries,
 )
@@ -127,9 +125,7 @@ class ClojureDeployJarClasspathEntryRequest(ClasspathEntryRequest):
 async def clojure_deploy_jar_classpath(
     request: ClojureDeployJarClasspathEntryRequest,
 ) -> FallibleClasspathEntry:
-    fallible_entries = await compile_classpath_entries(
-        **implicitly(ClasspathDependenciesRequest(request))
-    )
+    fallible_entries = await compile_classpath_entries(**implicitly(ClasspathDependenciesRequest(request)))
     classpath_entries = fallible_entries.if_all_succeeded()
     if classpath_entries is None:
         return FallibleClasspathEntry(
@@ -204,8 +200,7 @@ async def package_clojure_deploy_jar(
     if skip_aot:
         # Build runtime address set for JAR packaging (excludes provided)
         runtime_source_addresses = Addresses(
-            [tgt.address for tgt in clojure_source_targets if tgt.address not in provided_deps.addresses]
-            + extra_classpath_addresses
+            [tgt.address for tgt in clojure_source_targets if tgt.address not in provided_deps.addresses] + extra_classpath_addresses
         )
 
         # Get classpath
@@ -367,13 +362,8 @@ X-Source-Only: true
         )
 
     # Build address sets for classpaths, including non-Clojure classpath targets
-    all_source_addresses = Addresses(
-        [tgt.address for tgt in clojure_source_targets]
-        + extra_classpath_addresses
-    )
-    runtime_source_addresses = Addresses(
-        [addr for addr in all_source_addresses if addr not in provided_deps.addresses]
-    )
+    all_source_addresses = Addresses([tgt.address for tgt in clojure_source_targets] + extra_classpath_addresses)
+    runtime_source_addresses = Addresses([addr for addr in all_source_addresses if addr not in provided_deps.addresses])
 
     # Get both classpaths:
     # - compile_classpath: ALL deps including provided (for AOT compilation)
