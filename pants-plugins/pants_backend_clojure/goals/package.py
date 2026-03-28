@@ -26,7 +26,17 @@ from pants.engine.intrinsics import create_digest, get_digest_contents, merge_di
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
+from pants.jvm import compile
 from pants.jvm.classpath import classpath as classpath_get
+from pants.jvm.compile import (
+    ClasspathDependenciesRequest,
+    ClasspathEntry,
+    ClasspathEntryRequest,
+    ClasspathEntryRequestFactory,
+    CompileResult,
+    FallibleClasspathEntry,
+    compile_classpath_entries,
+)
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmJdkField, JvmResolveField
 from pants.util.logging import LogLevel
@@ -99,10 +109,44 @@ class ClojureDeployJarFieldSet(PackageFieldSet):
     output_path: OutputPathField
 
 
+class ClojureDeployJarClasspathEntryRequest(ClasspathEntryRequest):
+    """Classpath entry for clojure_deploy_jar targets.
+
+    Allows the deploy jar's own address to be passed to classpath_get(),
+    ensuring all transitive dependencies (including non-Clojure targets like
+    tailwind_css) are discovered as root CoarsenedTargets by the classpath resolver.
+    """
+
+    field_sets = (ClojureDeployJarFieldSet,)
+    root_only = True
+
+
+@rule(desc="Resolve Clojure deploy jar classpath", level=LogLevel.DEBUG)
+async def clojure_deploy_jar_classpath(
+    request: ClojureDeployJarClasspathEntryRequest,
+) -> FallibleClasspathEntry:
+    fallible_entries = await compile_classpath_entries(**implicitly(ClasspathDependenciesRequest(request)))
+    classpath_entries = fallible_entries.if_all_succeeded()
+    if classpath_entries is None:
+        return FallibleClasspathEntry(
+            description=str(request.component),
+            result=CompileResult.DEPENDENCY_FAILED,
+            output=None,
+            exit_code=1,
+        )
+    return FallibleClasspathEntry(
+        description=str(request.component),
+        result=CompileResult.SUCCEEDED,
+        output=ClasspathEntry(EMPTY_DIGEST, dependencies=classpath_entries),
+        exit_code=0,
+    )
+
+
 @rule(desc="Package Clojure deploy jar", level=LogLevel.DEBUG)
 async def package_clojure_deploy_jar(
     field_set: ClojureDeployJarFieldSet,
     jvm: JvmSubsystem,
+    classpath_entry_request_factory: ClasspathEntryRequestFactory,
 ) -> BuiltPackage:
     """Package a Clojure application into an executable JAR.
 
@@ -126,6 +170,21 @@ async def package_clojure_deploy_jar(
         tgt for tgt in trans_targets.dependencies if tgt.has_field(ClojureSourceField) or tgt.has_field(ClojureTestSourceField)
     ]
 
+    # Find non-Clojure targets that register a ClasspathEntryRequest (e.g., tailwind_css).
+    # These must be explicit root addresses because Pants resource generators use
+    # moved_fields which hides dependencies from the CoarsenedTarget graph.
+    clojure_addresses = {tgt.address for tgt in clojure_source_targets}
+    extra_classpath_addresses = []
+    for tgt in trans_targets.dependencies:
+        if tgt.address in clojure_addresses or tgt.address == field_set.address:
+            continue
+        if any(
+            any(fs.is_applicable(tgt) for fs in impl.field_sets)
+            for impl in classpath_entry_request_factory.impls
+            if impl is not ClojureDeployJarClasspathEntryRequest
+        ):
+            extra_classpath_addresses.append(tgt.address)
+
     # Get provided dependencies to exclude from the JAR
     resolve_name = field_set.resolve.normalized_value(jvm)
     provided_deps = await resolve_provided_dependencies(
@@ -140,9 +199,11 @@ async def package_clojure_deploy_jar(
     # =========================================================================
     if skip_aot:
         # Build runtime address set for JAR packaging (excludes provided)
-        runtime_source_addresses = Addresses(tgt.address for tgt in clojure_source_targets if tgt.address not in provided_deps.addresses)
+        runtime_source_addresses = Addresses(
+            [tgt.address for tgt in clojure_source_targets if tgt.address not in provided_deps.addresses] + extra_classpath_addresses
+        )
 
-        # Get classpath (excluding provided deps via address filtering)
+        # Get classpath
         runtime_classpath = await classpath_get(**implicitly({runtime_source_addresses: Addresses}))
 
         # Get first-party source files with stripped roots
@@ -300,9 +361,9 @@ X-Source-Only: true
             f'  (println "Hello, World!"))'
         )
 
-    # Build address sets for classpaths
-    all_source_addresses = Addresses(tgt.address for tgt in clojure_source_targets)
-    runtime_source_addresses = Addresses(addr for addr in all_source_addresses if addr not in provided_deps.addresses)
+    # Build address sets for classpaths, including non-Clojure classpath targets
+    all_source_addresses = Addresses([tgt.address for tgt in clojure_source_targets] + extra_classpath_addresses)
+    runtime_source_addresses = Addresses([addr for addr in all_source_addresses if addr not in provided_deps.addresses])
 
     # Get both classpaths:
     # - compile_classpath: ALL deps including provided (for AOT compilation)
@@ -409,5 +470,7 @@ X-Source-Only: true
 def rules():
     return [
         *collect_rules(),
+        *compile.rules(),
         UnionRule(PackageFieldSet, ClojureDeployJarFieldSet),
+        UnionRule(ClasspathEntryRequest, ClojureDeployJarClasspathEntryRequest),
     ]
