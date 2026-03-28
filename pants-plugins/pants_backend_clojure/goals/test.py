@@ -97,19 +97,11 @@ async def setup_clojure_test_for_target(
     transitive_targets_request = TransitiveTargetsRequest([request.field_set.address])
     addresses = Addresses([request.field_set.address])
 
-    try:
-        jdk, trans_targets, classpath = await concurrently(
-            prepare_jdk_environment(**implicitly({jdk_request: JdkRequest})),
-            transitive_targets(transitive_targets_request, **implicitly()),
-            classpath_get(**implicitly({addresses: Addresses})),
-        )
-    except IndexError as e:
-        raise Exception(
-            f"Failed to resolve classpath for {request.field_set.address}.\n\n"
-            f"This usually means a jvm_artifact with a `jar=` field points to a file "
-            f"that doesn't exist. Check that all local JAR files referenced by "
-            f"jvm_artifact targets are present on disk."
-        ) from e
+    jdk, trans_targets, classpath = await concurrently(
+        prepare_jdk_environment(**implicitly({jdk_request: JdkRequest})),
+        transitive_targets(transitive_targets_request, **implicitly()),
+        classpath_get(**implicitly({addresses: Addresses})),
+    )
 
     # Get test source file to parse namespace
     test_source_files = await determine_source_files(
