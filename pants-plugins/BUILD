@@ -1,4 +1,4 @@
-PLUGIN_VERSION = "0.2.0"
+PLUGIN_VERSION = "0.2.1"
 
 python_sources(
     name="pants-plugin-sources",
