@@ -26,17 +26,8 @@ from pants.engine.intrinsics import create_digest, get_digest_contents, merge_di
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
-from pants.jvm import compile
 from pants.jvm.classpath import classpath as classpath_get
-from pants.jvm.compile import (
-    ClasspathDependenciesRequest,
-    ClasspathEntry,
-    ClasspathEntryRequest,
-    ClasspathEntryRequestFactory,
-    CompileResult,
-    FallibleClasspathEntry,
-    compile_classpath_entries,
-)
+from pants.jvm.compile import ClasspathEntryRequestFactory
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmJdkField, JvmResolveField
 from pants.util.logging import LogLevel
@@ -109,39 +100,6 @@ class ClojureDeployJarFieldSet(PackageFieldSet):
     output_path: OutputPathField
 
 
-class ClojureDeployJarClasspathEntryRequest(ClasspathEntryRequest):
-    """Classpath entry for clojure_deploy_jar targets.
-
-    Allows the deploy jar's own address to be passed to classpath_get(),
-    ensuring all transitive dependencies (including non-Clojure targets like
-    tailwind_css) are discovered as root CoarsenedTargets by the classpath resolver.
-    """
-
-    field_sets = (ClojureDeployJarFieldSet,)
-    root_only = True
-
-
-@rule(desc="Resolve Clojure deploy jar classpath", level=LogLevel.DEBUG)
-async def clojure_deploy_jar_classpath(
-    request: ClojureDeployJarClasspathEntryRequest,
-) -> FallibleClasspathEntry:
-    fallible_entries = await compile_classpath_entries(**implicitly(ClasspathDependenciesRequest(request)))
-    classpath_entries = fallible_entries.if_all_succeeded()
-    if classpath_entries is None:
-        return FallibleClasspathEntry(
-            description=str(request.component),
-            result=CompileResult.DEPENDENCY_FAILED,
-            output=None,
-            exit_code=1,
-        )
-    return FallibleClasspathEntry(
-        description=str(request.component),
-        result=CompileResult.SUCCEEDED,
-        output=ClasspathEntry(EMPTY_DIGEST, dependencies=classpath_entries),
-        exit_code=0,
-    )
-
-
 @rule(desc="Package Clojure deploy jar", level=LogLevel.DEBUG)
 async def package_clojure_deploy_jar(
     field_set: ClojureDeployJarFieldSet,
@@ -179,9 +137,7 @@ async def package_clojure_deploy_jar(
         if tgt.address in clojure_addresses or tgt.address == field_set.address:
             continue
         if any(
-            any(fs.is_applicable(tgt) for fs in impl.field_sets)
-            for impl in classpath_entry_request_factory.impls
-            if impl is not ClojureDeployJarClasspathEntryRequest
+            any(fs.is_applicable(tgt) for fs in impl.field_sets) for impl in classpath_entry_request_factory.impls if not impl.root_only
         ):
             extra_classpath_addresses.append(tgt.address)
 
@@ -470,7 +426,5 @@ X-Source-Only: true
 def rules():
     return [
         *collect_rules(),
-        *compile.rules(),
         UnionRule(PackageFieldSet, ClojureDeployJarFieldSet),
-        UnionRule(ClasspathEntryRequest, ClojureDeployJarClasspathEntryRequest),
     ]

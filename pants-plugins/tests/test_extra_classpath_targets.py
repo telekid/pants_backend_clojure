@@ -374,3 +374,79 @@ def test_deploy_jar_without_custom_target_still_works(
 
     assert len(result.artifacts) == 1
     assert result.artifacts[0].relpath.endswith(".jar")
+
+
+def test_source_only_deploy_jar_includes_custom_classpath_entry_target(
+    rule_runner: RuleRunner,
+) -> None:
+    """The source-only JAR path (main="clojure.main") should also include
+    custom ClasspathEntryRequest target outputs in the final JAR.
+
+    This covers the other branch in package.py — source files are packaged
+    directly via Python zipfile rather than delegating to tools.build.
+    """
+    setup_rule_runner(rule_runner)
+    rule_runner.write_files(
+        {
+            "locks/jvm/java17.lock.jsonc": CLOJURE_LOCKFILE,
+            "3rdparty/jvm/BUILD": CLOJURE_3RDPARTY_BUILD,
+            "src/css/BUILD": dedent(
+                """\
+                mock_asset(
+                    name="build-css",
+                    source="input.txt",
+                    output_path="app/style.css",
+                )
+                """
+            ),
+            "src/css/input.txt": "/* source */\n",
+            "src/app/BUILD": dedent(
+                """\
+                clojure_source(
+                    name="core",
+                    source="core.clj",
+                    dependencies=["3rdparty/jvm:org.clojure_clojure"],
+                )
+
+                clojure_deploy_jar(
+                    name="app",
+                    main="clojure.main",
+                    dependencies=[":core", "src/css:build-css"],
+                )
+                """
+            ),
+            "src/app/core.clj": dedent(
+                """\
+                (ns app.core)
+
+                (defn -main [& args]
+                  (println "Hello"))
+                """
+            ),
+        }
+    )
+
+    target = rule_runner.get_target(Address("src/app", target_name="app"))
+    field_set = ClojureDeployJarFieldSet.create(target)
+    result = rule_runner.request(BuiltPackage, [field_set])
+
+    assert len(result.artifacts) == 1
+
+    # Extract JAR and verify contents
+    jar_digest_contents = rule_runner.request(DigestContents, [result.digest])
+    jar_path = result.artifacts[0].relpath
+    jar_content = None
+    for file_content in jar_digest_contents:
+        if file_content.path == jar_path:
+            jar_content = file_content.content
+            break
+
+    assert jar_content is not None, f"Could not find JAR at {jar_path}"
+
+    with zipfile.ZipFile(io.BytesIO(jar_content), "r") as jar:
+        entries = set(jar.namelist())
+
+    assert "app/style.css" in entries, (
+        f"Custom ClasspathEntryRequest target output 'app/style.css' not found in JAR. Entries: {sorted(entries)}"
+    )
+    assert "app/core.clj" in entries, f"Source file 'app/core.clj' not found in JAR. Entries: {sorted(entries)}"
