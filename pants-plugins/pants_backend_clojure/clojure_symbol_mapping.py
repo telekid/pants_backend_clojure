@@ -261,7 +261,15 @@ async def build_third_party_clojure_namespace_mapping(
             coords_with_explicit_packages.add((group, artifact))
 
     # Fetch all JARs using Coursier (uses cache)
-    classpath_entries = await concurrently(coursier_fetch_one_coord(entry, **implicitly()) for entry in lockfile.entries)
+    try:
+        classpath_entries = await concurrently(coursier_fetch_one_coord(entry, **implicitly()) for entry in lockfile.entries)
+    except IndexError:
+        logger.warning(
+            "Failed to fetch some JARs for namespace analysis. "
+            "This may happen when a jvm_artifact with a `jar=` field points to a missing file. "
+            "Skipping third-party namespace mapping."
+        )
+        return ThirdPartyClojureNamespaceMapping(FrozenDict())
 
     # Analyze each JAR for Clojure namespaces
     mapping: dict[str, list[Address]] = {}
