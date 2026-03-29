@@ -352,6 +352,10 @@ find_links = [
 
 Rebuild the wheel after each change and Pants will pick it up automatically.
 
+## Example Projects
+
+- [Pedestal](https://github.com/enragedginger/pedestal) — the Pedestal web framework, built with Pants and this plugin
+
 ## Contributing
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
