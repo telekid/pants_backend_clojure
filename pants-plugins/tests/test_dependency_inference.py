@@ -3,15 +3,21 @@
 from pants_backend_clojure.utils.namespace_parser import (
     class_to_path,
     is_jdk_class,
-    namespace_to_path,
+    namespace_to_paths,
     path_to_namespace,
 )
 
 
-def test_namespace_to_path():
-    """Test converting namespace to file path."""
-    assert namespace_to_path("example.project-a.core") == "example/project_a/core.clj"
-    assert namespace_to_path("foo.bar-baz.qux") == "foo/bar_baz/qux.clj"
+def test_namespace_to_paths():
+    """Test converting namespace to candidate file paths."""
+    assert namespace_to_paths("example.project-a.core") == (
+        "example/project_a/core.clj",
+        "example/project_a/core.cljc",
+    )
+    assert namespace_to_paths("foo.bar-baz.qux") == (
+        "foo/bar_baz/qux.clj",
+        "foo/bar_baz/qux.cljc",
+    )
 
 
 def test_path_to_namespace():
@@ -22,10 +28,11 @@ def test_path_to_namespace():
 
 
 def test_namespace_path_roundtrip():
-    """Test that namespace <-> path conversion is reversible."""
+    """Test that namespace -> path -> namespace conversion is reversible."""
     namespace = "example.project-a.core-utils"
-    path = namespace_to_path(namespace)
-    assert path_to_namespace(path) == namespace
+    paths = namespace_to_paths(namespace)
+    for path in paths:
+        assert path_to_namespace(path) == namespace
 
 
 # ===== class_to_path tests =====

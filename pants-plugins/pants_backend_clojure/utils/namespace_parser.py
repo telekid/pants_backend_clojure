@@ -10,24 +10,17 @@ which properly invokes clj-kondo inside the Pants sandbox.
 
 from __future__ import annotations
 
+from pants_backend_clojure.config import CLOJURE_SOURCE_EXTENSIONS
 
-def namespace_to_path(namespace: str) -> str:
-    """Convert a Clojure namespace to its expected file path.
 
-    Args:
-        namespace: The Clojure namespace name.
+def namespace_to_paths(namespace: str) -> tuple[str, ...]:
+    """Convert a Clojure namespace to all candidate file paths.
 
-    Returns:
-        The expected file path for the namespace.
-
-    Example:
-        "example.project-a.core" -> "example/project_a/core.clj"
-
-    Note:
-        Clojure uses underscores in file paths for hyphens in namespaces.
+    Returns a tuple of candidate paths for each supported Clojure source extension,
+    e.g. ("example/project_a/core.clj", "example/project_a/core.cljc")
     """
-    path = namespace.replace(".", "/").replace("-", "_")
-    return f"{path}.clj"
+    stem = namespace.replace(".", "/").replace("-", "_")
+    return tuple(f"{stem}{ext}" for ext in CLOJURE_SOURCE_EXTENSIONS)
 
 
 def path_to_namespace(file_path: str) -> str:

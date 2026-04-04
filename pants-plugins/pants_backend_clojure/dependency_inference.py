@@ -46,7 +46,7 @@ from pants_backend_clojure.target_types import (
 )
 from pants_backend_clojure.utils.namespace_parser import (
     is_jdk_class,
-    namespace_to_path,
+    namespace_to_paths,
 )
 
 
@@ -156,14 +156,14 @@ async def _infer_clojure_dependencies_impl(
         # FIRST: Try first-party sources using OwnersRequest
         # Convert namespace to expected file path
         # e.g., "example.project-a.core" -> "example/project_a/core.clj"
-        file_path = namespace_to_path(namespace)
+        candidate_paths = namespace_to_paths(namespace)
 
         # Try to find owners with different path variations
         # Since we don't know the source root, try with just the namespace path
         # and also try **/path (glob pattern)
         possible_paths = [
-            file_path,  # Direct path
-            f"**/{file_path}",  # Glob to find anywhere in project
+            *candidate_paths,  # Direct paths (.clj, .cljc)
+            *(f"**/{p}" for p in candidate_paths),  # Glob to find anywhere in project
         ]
 
         found_first_party = False

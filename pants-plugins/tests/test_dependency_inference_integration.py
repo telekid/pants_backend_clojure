@@ -434,3 +434,132 @@ def test_no_resources_inference_for_non_brick_paths(rule_runner: RuleRunner) -> 
 
     # Root-level target has no parent/src path, so no inference
     assert inferred == InferredDependencies([])
+
+
+# ===== .cljc dependency inference tests =====
+
+
+@maybe_skip_jdk_test
+def test_infer_cljc_source_dependency(rule_runner: RuleRunner) -> None:
+    """Test that dependency inference works for .cljc files."""
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name="org.clojure_clojure",
+                    group="org.clojure",
+                    artifact="clojure",
+                    version="1.12.3",
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": "# Empty lockfile for testing\n",
+            "BUILD": dedent(
+                """\
+                clojure_source(
+                    name='utils',
+                    source='my/utils.cljc',
+                )
+
+                clojure_test(
+                    name='test',
+                    source='my/utils_test.cljc',
+                )
+                """
+            ),
+            "my/utils.cljc": dedent(
+                """\
+                (ns my.utils)
+
+                (defn add [a b]
+                  (+ a b))
+                """
+            ),
+            "my/utils_test.cljc": dedent(
+                """\
+                (ns my.utils-test
+                  (:require [clojure.test :refer [deftest is]]
+                            [my.utils :as utils]))
+
+                (deftest test-add
+                  (is (= 5 (utils/add 2 3))))
+                """
+            ),
+        }
+    )
+
+    test_target = rule_runner.get_target(Address("", target_name="test", relative_file_path="my/utils_test.cljc"))
+    utils_target = rule_runner.get_target(Address("", target_name="utils", relative_file_path="my/utils.cljc"))
+
+    from pants_backend_clojure.dependency_inference import ClojureTestDependenciesInferenceFieldSet
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferClojureTestDependencies(ClojureTestDependenciesInferenceFieldSet.create(test_target))],
+    )
+
+    assert inferred == InferredDependencies([utils_target.address])
+
+
+@maybe_skip_jdk_test
+def test_infer_clj_test_depending_on_cljc_source(rule_runner: RuleRunner) -> None:
+    """Test that a .clj test can infer dependency on a .cljc source."""
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/BUILD": dedent(
+                """\
+                jvm_artifact(
+                    name="org.clojure_clojure",
+                    group="org.clojure",
+                    artifact="clojure",
+                    version="1.12.3",
+                )
+                """
+            ),
+            "3rdparty/jvm/default.lock": "# Empty lockfile for testing\n",
+            "BUILD": dedent(
+                """\
+                clojure_source(
+                    name='utils',
+                    source='my/utils.cljc',
+                )
+
+                clojure_test(
+                    name='test',
+                    source='my/utils_test.clj',
+                )
+                """
+            ),
+            "my/utils.cljc": dedent(
+                """\
+                (ns my.utils)
+
+                (defn add [a b]
+                  (+ a b))
+                """
+            ),
+            "my/utils_test.clj": dedent(
+                """\
+                (ns my.utils-test
+                  (:require [clojure.test :refer [deftest is]]
+                            [my.utils :as utils]))
+
+                (deftest test-add
+                  (is (= 5 (utils/add 2 3))))
+                """
+            ),
+        }
+    )
+
+    test_target = rule_runner.get_target(Address("", target_name="test", relative_file_path="my/utils_test.clj"))
+    utils_target = rule_runner.get_target(Address("", target_name="utils", relative_file_path="my/utils.cljc"))
+
+    from pants_backend_clojure.dependency_inference import ClojureTestDependenciesInferenceFieldSet
+
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferClojureTestDependencies(ClojureTestDependenciesInferenceFieldSet.create(test_target))],
+    )
+
+    assert inferred == InferredDependencies([utils_target.address])
